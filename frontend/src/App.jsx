@@ -34,7 +34,7 @@ function App() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="container mx-auto px-4 py-8 max-w-7xl"
+          className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-7xl"
         >
           <Routes>
             <Route path="/" element={<Dashboard />} />

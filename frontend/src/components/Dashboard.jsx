@@ -93,23 +93,23 @@ const Dashboard = () => {
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-gray-100 mb-3">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 dark:text-gray-100 mb-3 leading-tight">
           Scan Your <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">Food Labels</span>
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-300">
+        <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-2 sm:px-0">
           Upload product label photos for instant AI-powered nutritional analysis
         </p>
       </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon
           return (
@@ -118,12 +118,12 @@ const Dashboard = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="card p-6 text-center"
+              className="card p-4 sm:p-6 text-center"
             >
               <div className={`inline-flex items-center justify-center w-12 h-12 bg-${stat.color} bg-opacity-10 rounded-xl mb-3`}>
                 <Icon className={`w-6 h-6 text-${stat.color}`} />
               </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">{stat.value}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">{stat.value}</p>
               <p className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
             </motion.div>
           )
@@ -141,7 +141,7 @@ const Dashboard = () => {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`
-            card p-12 text-center cursor-pointer transition-all duration-300
+            card p-6 sm:p-8 md:p-12 text-center cursor-pointer transition-all duration-300
             ${isDragging ? 'border-4 border-primary-500 bg-primary-50 dark:bg-primary-900/20 scale-105' : 'border-2 border-dashed border-gray-300 dark:border-gray-600'}
           `}
           onClick={() => fileInputRef.current?.click()}
@@ -162,41 +162,41 @@ const Dashboard = () => {
             }}
             transition={{ type: "spring", stiffness: 300 }}
           >
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full mb-6 shadow-lg">
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full mb-4 sm:mb-6 shadow-lg">
               {isDragging ? (
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 >
-                  <Upload className="w-12 h-12 text-white" />
+                  <Upload className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
                 </motion.div>
               ) : (
-                <Camera className="w-12 h-12 text-white" />
+                <Camera className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
               )}
             </div>
 
-            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
               {isDragging ? 'Drop your images here!' : 'Upload Product Labels'}
             </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
               Drag & drop images or click to browse
             </p>
 
-            <div className="flex items-center justify-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="btn-primary"
+                className="btn-primary w-full sm:w-auto"
                 type="button"
               >
                 <Upload className="w-5 h-5 mr-2 inline" />
                 Choose Files
               </motion.button>
-              <span className="text-sm text-gray-500">or</span>
+              <span className="text-sm text-gray-500 hidden sm:inline">or</span>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="btn-secondary"
+                className="btn-secondary w-full sm:w-auto"
                 type="button"
               >
                 <Camera className="w-5 h-5 mr-2 inline" />
@@ -219,7 +219,7 @@ const Dashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
               Uploaded Labels ({uploadedFiles.length})
             </h2>
             

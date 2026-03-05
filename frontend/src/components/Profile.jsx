@@ -149,12 +149,12 @@ const Profile = () => {
       className="max-w-4xl mx-auto"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full mb-4 shadow-lg">
-          <User className="w-10 h-10 text-white" />
+      <motion.div variants={itemVariants} className="text-center mb-6 sm:mb-8 px-1">
+        <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full mb-4 shadow-lg">
+          <User className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
         </div>
-        <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Health Profile</h1>
-        <p className="text-gray-600 dark:text-gray-300">Help us personalize your nutritional recommendations</p>
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Health Profile</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Help us personalize your nutritional recommendations</p>
       </motion.div>
 
       {/* Success Message */}
@@ -192,9 +192,9 @@ const Profile = () => {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
           {/* Personal Information Card */}
-          <motion.div variants={itemVariants} className="card p-6 md:col-span-2">
+          <motion.div variants={itemVariants} className="card p-4 sm:p-6 md:col-span-2">
             <div className="flex items-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
                 <User className="w-6 h-6 text-primary-600 dark:text-primary-400" />
@@ -202,7 +202,7 @@ const Profile = () => {
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Personal Information</h2>
             </div>
             
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <label className="label">Full Name *</label>
                 <input
@@ -295,7 +295,7 @@ const Profile = () => {
           </motion.div>
 
           {/* Body Metrics Card */}
-          <motion.div variants={itemVariants} className="card p-6">
+          <motion.div variants={itemVariants} className="card p-4 sm:p-6">
             <div className="flex items-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg flex items-center justify-center">
                 <Activity className="w-6 h-6 text-secondary-600 dark:text-secondary-400" />
@@ -372,7 +372,7 @@ const Profile = () => {
           </motion.div>
 
           {/* Health Information Card */}
-          <motion.div variants={itemVariants} className="card p-6">
+          <motion.div variants={itemVariants} className="card p-4 sm:p-6">
             <div className="flex items-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-health-danger bg-opacity-10 dark:bg-health-danger dark:bg-opacity-20 rounded-lg flex items-center justify-center">
                 <Heart className="w-6 h-6 text-health-danger" />
@@ -399,7 +399,7 @@ const Profile = () => {
           </motion.div>
 
           {/* Medical Conditions Card */}
-          <motion.div variants={itemVariants} className="card p-6 md:col-span-2">
+          <motion.div variants={itemVariants} className="card p-4 sm:p-6 md:col-span-2">
             <div className="flex items-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-health-warning bg-opacity-10 dark:bg-health-warning dark:bg-opacity-20 rounded-lg flex items-center justify-center">
                 <AlertCircle className="w-6 h-6 text-health-warning" />
@@ -407,10 +407,10 @@ const Profile = () => {
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Medical Information</h2>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <label className="label">Medical Conditions</label>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <input
                     type="text"
                     value={newCondition}
@@ -424,7 +424,7 @@ const Profile = () => {
                     onClick={addMedicalCondition}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors"
+                    className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors w-full sm:w-auto"
                   >
                     <Plus className="w-5 h-5" />
                   </motion.button>
@@ -453,7 +453,7 @@ const Profile = () => {
 
               <div>
                 <label className="label">Allergies & Intolerances</label>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <input
                     type="text"
                     value={newAllergy}
@@ -467,7 +467,7 @@ const Profile = () => {
                     onClick={addAllergy}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors"
+                    className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors w-full sm:w-auto"
                   >
                     <Plus className="w-5 h-5" />
                   </motion.button>
@@ -496,7 +496,7 @@ const Profile = () => {
 
               <div className="md:col-span-2">
                 <label className="label">Dietary Preferences</label>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <input
                     type="text"
                     value={newDietPref}
@@ -510,7 +510,7 @@ const Profile = () => {
                     onClick={addDietPref}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors"
+                    className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors w-full sm:w-auto"
                   >
                     <Plus className="w-5 h-5" />
                   </motion.button>
@@ -549,7 +549,7 @@ const Profile = () => {
             type="submit"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="btn-primary px-12 py-4 text-lg flex items-center space-x-3"
+            className="btn-primary w-full sm:w-auto px-6 sm:px-12 py-3 sm:py-4 text-base sm:text-lg flex items-center justify-center space-x-3"
           >
             <Save className="w-6 h-6" />
             <span>Save Profile</span>

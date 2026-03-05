@@ -123,7 +123,7 @@ const ComingSoon = () => {
       className="max-w-6xl mx-auto"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="text-center mb-12">
+      <motion.div variants={itemVariants} className="text-center mb-8 sm:mb-12 px-1">
         <motion.div
           animate={{
             rotate: [0, 360],
@@ -134,15 +134,15 @@ const ComingSoon = () => {
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full mb-6 shadow-2xl"
+          className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full mb-4 sm:mb-6 shadow-2xl"
         >
-          <Sparkles className="w-12 h-12 text-white" />
+          <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
         </motion.div>
         
-        <h1 className="text-5xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 dark:text-gray-100 mb-4 leading-tight">
           Exciting Features <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">Coming Soon</span>
         </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+        <p className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
           We're constantly innovating to bring you the most advanced nutritional analysis platform. Here's what's in the pipeline!
         </p>
       </motion.div>
@@ -150,7 +150,7 @@ const ComingSoon = () => {
       {/* Premium Teaser */}
       <motion.div
         variants={itemVariants}
-        className="card p-8 bg-gradient-to-r from-primary-500 to-secondary-500 text-white mb-12 relative overflow-hidden"
+        className="card p-5 sm:p-6 md:p-8 bg-gradient-to-r from-primary-500 to-secondary-500 text-white mb-8 sm:mb-12 relative overflow-hidden"
       >
         <motion.div
           className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"
@@ -166,18 +166,18 @@ const ComingSoon = () => {
         />
         
         <div className="relative z-10">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center space-x-3 mb-2">
-                <Crown className="w-8 h-8" />
-                <h2 className="text-3xl font-bold">NutriVision Premium</h2>
+                <Crown className="w-6 h-6 sm:w-8 sm:h-8" />
+                <h2 className="text-2xl sm:text-3xl font-bold">NutriVision Premium</h2>
               </div>
-              <p className="text-primary-100 text-lg">Unlock the full potential of AI-powered nutrition</p>
+              <p className="text-primary-100 text-base sm:text-lg">Unlock the full potential of AI-powered nutrition</p>
             </div>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="bg-white text-primary-600 px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all"
+              className="bg-white text-primary-600 px-6 sm:px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all w-full sm:w-auto"
             >
               Join Waitlist
             </motion.button>
@@ -204,7 +204,7 @@ const ComingSoon = () => {
       </motion.div>
 
       {/* Features Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
         {features.map((feature, index) => {
           const Icon = feature.icon
           
@@ -213,7 +213,7 @@ const ComingSoon = () => {
               key={index}
               variants={itemVariants}
               whileHover={{ y: -8, scale: 1.02 }}
-              className="card p-6 group relative overflow-hidden"
+              className="card p-4 sm:p-6 group relative overflow-hidden"
             >
               {/* Background gradient on hover */}
               <div className="absolute inset-0 bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -225,7 +225,7 @@ const ComingSoon = () => {
                 </div>
 
                 {/* Content */}
-                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                   {feature.title}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 leading-relaxed">
@@ -259,17 +259,17 @@ const ComingSoon = () => {
       {/* Newsletter Signup */}
       <motion.div
         variants={itemVariants}
-        className="card p-8 text-center bg-gradient-to-br from-gray-50 to-primary-50 dark:from-gray-800 dark:to-primary-900/20"
+        className="card p-5 sm:p-8 text-center bg-gradient-to-br from-gray-50 to-primary-50 dark:from-gray-800 dark:to-primary-900/20"
       >
         <Bell className="w-12 h-12 text-primary-600 dark:text-primary-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
           Stay Updated
         </h2>
         <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md mx-auto">
           Be the first to know when new features launch. Join our newsletter for exclusive updates and early access.
         </p>
         
-        <div className="flex max-w-md mx-auto gap-3">
+        <div className="flex flex-col sm:flex-row max-w-md mx-auto gap-3">
           <input
             type="email"
             placeholder="Enter your email"
@@ -278,7 +278,7 @@ const ComingSoon = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto"
           >
             Subscribe
           </motion.button>
