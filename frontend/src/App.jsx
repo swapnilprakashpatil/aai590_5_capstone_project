@@ -27,7 +27,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
         <Navbar darkMode={darkMode} toggleTheme={toggleTheme} />
         <motion.main
