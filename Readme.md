@@ -47,7 +47,8 @@ Core idea:
 
 Source dataset:
 
-- https://www.kaggle.com/datasets/openfoodfacts/world-food-facts
+- Kaggle snapshot: https://www.kaggle.com/datasets/openfoodfacts/world-food-facts
+- Open Food Facts official export (recommended for latest fields, including NOVA): https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
 
 1. Open the Kaggle link above and download the dataset as a ZIP file.
 2. Extract the downloaded files.
@@ -65,6 +66,14 @@ kaggle datasets download -d openfoodfacts/world-food-facts -p dataset
 ```
 
 Then unzip into `dataset/` so the TSV files are directly available there.
+
+Optional (direct Open Food Facts download):
+
+```powershell
+Invoke-WebRequest -Uri "https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz" -OutFile "dataset/en.openfoodfacts.org.products.csv.gz"
+```
+
+Then decompress and place the extracted file in `dataset/` before loading it in notebooks.
 
 ## Using the Notebooks
 
@@ -133,7 +142,9 @@ npm run preview
 ### Dataset Information
 
 - **Name:** Open Food Facts - World Food Facts
-- **Source:** https://www.kaggle.com/datasets/openfoodfacts/world-food-facts
+- **Source:**
+  - Kaggle snapshot: https://www.kaggle.com/datasets/openfoodfacts/world-food-facts
+  - Open Food Facts official export: https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
 - **Primary file used in this project:** `dataset/en.openfoodfacts.org.products.tsv`
 - **Format:** Tab-separated values (TSV)
 - **Granularity:** One row per product
@@ -167,3 +178,4 @@ Notes:
 - Column availability and completeness can vary by product and country.
 - Missing values are expected and should be handled during preprocessing.
 - Some fields may appear with minor naming variations depending on dataset version.
+- `nova_group` availability depends on the dataset version/source. If missing in older snapshots, use the latest official Open Food Facts export.

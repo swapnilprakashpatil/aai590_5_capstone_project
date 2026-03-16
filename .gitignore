@@ -133,5 +133,6 @@ dmypy.json
 cython_debug/
 
 dataset/*.tsv
+dataset/*.csv
 dataset/*.zip
-
+dataset/*.gz
