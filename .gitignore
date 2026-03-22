@@ -136,3 +136,4 @@ dataset/*.tsv
 dataset/en.openfoodfacts.org.products.csv
 dataset/*.zip
 dataset/*.gz
+dataset/light.csv
