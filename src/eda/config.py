@@ -13,12 +13,15 @@ META_COLS = [
     "additives_n",
     "additives_tags",
     "ingredients_text",
+    "ingredients_from_palm_oil_n",
+    "ingredients_that_may_be_from_palm_oil_n",
 ]
 
 BASE_NUTRIENT_COLS = [
     "energy_100g",
     "fat_100g",
     "saturated-fat_100g",
+    "trans-fat_100g",
     "carbohydrates_100g",
     "sugars_100g",
     "fiber_100g",

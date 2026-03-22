@@ -7,9 +7,13 @@ with the nutrient columns.
 
 from __future__ import annotations
 
+import gc
+
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
+
+from src.eda.data import memory_usage_mb, optimize_memory
 
 from .config import (
     CATEGORY_ENCODE_COLS,
@@ -27,7 +31,6 @@ def create_nutrient_ratios(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
     Returns the augmented DataFrame and a list of new column names.
     """
-    df = df.copy()
     created: list[str] = []
 
     def _safe_ratio(
@@ -36,7 +39,7 @@ def create_nutrient_ratios(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
         name: str,
     ) -> None:
         ratio = numerator / denominator.replace(0, np.nan)
-        df[name] = ratio.clip(upper=ratio.quantile(0.99))
+        df[name] = ratio.clip(upper=ratio.quantile(0.99)).astype(np.float32)
         created.append(name)
 
     if "sugars_100g" in df.columns and "carbohydrates_100g" in df.columns:
@@ -47,14 +50,12 @@ def create_nutrient_ratios(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
     if "fat_100g" in df.columns and "energy_100g" in df.columns:
         # Fat contributes ~37 kJ per gram
-        df["fat_energy_pct"] = (df["fat_100g"] * 37) / df["energy_100g"].replace(0, np.nan)
-        df["fat_energy_pct"] = df["fat_energy_pct"].clip(0, 1)
+        df["fat_energy_pct"] = ((df["fat_100g"] * 37) / df["energy_100g"].replace(0, np.nan)).clip(0, 1).astype(np.float32)
         created.append("fat_energy_pct")
 
     if "proteins_100g" in df.columns and "energy_100g" in df.columns:
         # Protein contributes ~17 kJ per gram
-        df["protein_energy_pct"] = (df["proteins_100g"] * 17) / df["energy_100g"].replace(0, np.nan)
-        df["protein_energy_pct"] = df["protein_energy_pct"].clip(0, 1)
+        df["protein_energy_pct"] = ((df["proteins_100g"] * 17) / df["energy_100g"].replace(0, np.nan)).clip(0, 1).astype(np.float32)
         created.append("protein_energy_pct")
 
     if "fiber_100g" in df.columns and "carbohydrates_100g" in df.columns:
@@ -62,6 +63,9 @@ def create_nutrient_ratios(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
     if "salt_100g" in df.columns and "energy_100g" in df.columns:
         _safe_ratio(df["salt_100g"], df["energy_100g"], "salt_per_energy")
+
+    if "trans-fat_100g" in df.columns and "fat_100g" in df.columns:
+        _safe_ratio(df["trans-fat_100g"], df["fat_100g"], "trans_fat_to_fat_ratio")
 
     # Fill NaN ratios with 0 (occurs when denominator was 0 or missing)
     for col in created:
@@ -90,7 +94,7 @@ def create_additive_features(
 
     # Cleaned count
     if "additives_n" in df.columns:
-        df["additives_count"] = df["additives_n"].fillna(0).astype(int)
+        df["additives_count"] = df["additives_n"].fillna(0).astype(np.int16)
     elif "additives_tags" in df.columns:
         df["additives_count"] = (
             df["additives_tags"]
@@ -102,7 +106,7 @@ def create_additive_features(
     created.append("additives_count")
 
     # Binary flag
-    df["has_additives"] = (df["additives_count"] > 0).astype(int)
+    df["has_additives"] = (df["additives_count"] > 0).astype(np.int8)
     created.append("has_additives")
 
     # Top-N individual additive flags
@@ -125,7 +129,7 @@ def create_additive_features(
                 df["additives_tags"]
                 .fillna("")
                 .str.contains(additive, case=False, regex=False)
-                .astype(int)
+                .astype(np.int8)
             )
             created.append(col_name)
 
@@ -143,7 +147,6 @@ def create_ingredient_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str
     - ingredient_count : number of comma-separated ingredients
     - ingredients_length : character length of the ingredient list
     """
-    df = df.copy()
     created: list[str] = []
 
     if "ingredients_text" in df.columns:
@@ -151,11 +154,39 @@ def create_ingredient_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str
 
         df["ingredient_count"] = text.apply(
             lambda v: len([i for i in v.split(",") if i.strip()]) if v else 0
-        )
+        ).astype(np.int16)
         created.append("ingredient_count")
 
-        df["ingredients_length"] = text.str.len()
+        df["ingredients_length"] = text.str.len().astype(np.int32)
         created.append("ingredients_length")
+
+    return df, created
+
+
+# ── Palm Oil Features ────────────────────────────────────────────────────────
+
+
+def create_palm_oil_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Create features from palm-oil ingredient counts.
+
+    Features
+    --------
+    - palm_oil_ingredients : count of ingredients from palm oil (cleaned)
+    - has_palm_oil : binary flag for any palm-oil ingredient
+    """
+    created: list[str] = []
+
+    palm_col = "ingredients_from_palm_oil_n"
+    maybe_col = "ingredients_that_may_be_from_palm_oil_n"
+
+    if palm_col in df.columns or maybe_col in df.columns:
+        palm = df[palm_col].fillna(0) if palm_col in df.columns else 0
+        maybe = df[maybe_col].fillna(0) if maybe_col in df.columns else 0
+        df["palm_oil_ingredients"] = (palm + maybe).astype(np.int16)
+        created.append("palm_oil_ingredients")
+
+        df["has_palm_oil"] = (df["palm_oil_ingredients"] > 0).astype(np.int8)
+        created.append("has_palm_oil")
 
     return df, created
 
@@ -191,7 +222,7 @@ def encode_categories(
 
         enc = LabelEncoder()
         enc_col = f"{col}_encoded"
-        df[enc_col] = enc.fit_transform(series)
+        df[enc_col] = enc.fit_transform(series).astype(np.int16)
         created.append(enc_col)
         encoders[col] = enc
 
@@ -215,7 +246,7 @@ def create_nutrient_profile_score(df: pd.DataFrame) -> tuple[pd.DataFrame, list[
     df = df.copy()
     created: list[str] = []
 
-    neg_cols = ["energy_100g", "saturated-fat_100g", "sugars_100g", "salt_100g"]
+    neg_cols = ["energy_100g", "saturated-fat_100g", "trans-fat_100g", "sugars_100g", "salt_100g"]
     pos_cols = ["fiber_100g", "proteins_100g"]
 
     avail_neg = [c for c in neg_cols if c in df.columns]
@@ -229,11 +260,11 @@ def create_nutrient_profile_score(df: pd.DataFrame) -> tuple[pd.DataFrame, list[
         col_min = df[col].min()
         col_max = df[col].max()
         rng = col_max - col_min
-        df[f"_scaled_{col}"] = (df[col] - col_min) / rng if rng > 0 else 0
+        df[f"_scaled_{col}"] = ((df[col] - col_min) / rng if rng > 0 else 0).astype(np.float32)
 
     df["neg_score"] = df[[f"_scaled_{c}" for c in avail_neg]].sum(axis=1)
     df["pos_score"] = df[[f"_scaled_{c}" for c in avail_pos]].sum(axis=1)
-    df["nutrient_profile_score"] = df["neg_score"] - df["pos_score"]
+    df["nutrient_profile_score"] = (df["neg_score"] - df["pos_score"]).astype(np.float32)
     created.append("nutrient_profile_score")
 
     # Clean up temp columns
@@ -302,20 +333,28 @@ def run_feature_engineering(
     df, ing_cols = create_ingredient_features(df)
     log.append({"step": "Ingredient features", "features_added": len(ing_cols), "detail": ", ".join(ing_cols)})
 
-    # 4  Category encoding
+    # 4  Palm oil features
+    df, palm_cols = create_palm_oil_features(df)
+    log.append({"step": "Palm oil features", "features_added": len(palm_cols), "detail": ", ".join(palm_cols)})
+
+    # 5  Category encoding
     df, cat_cols, _ = encode_categories(df)
     log.append({"step": "Category encoding", "features_added": len(cat_cols), "detail": ", ".join(cat_cols)})
 
-    # 5  Nutrient profile score
+    # 6  Nutrient profile score
     df, nps_cols = create_nutrient_profile_score(df)
     log.append({"step": "Nutrient profile score", "features_added": len(nps_cols), "detail": ", ".join(nps_cols)})
 
-    all_feature_cols = nutrient_cols + ratio_cols + add_cols + ing_cols + cat_cols + nps_cols
+    all_feature_cols = nutrient_cols + ratio_cols + add_cols + ing_cols + palm_cols + cat_cols + nps_cols
 
     log.append({
         "step": "TOTAL",
         "features_added": len(all_feature_cols) - len(nutrient_cols),
         "detail": f"{len(all_feature_cols)} total feature columns",
     })
+
+    # Final memory compaction
+    df = optimize_memory(df)
+    gc.collect()
 
     return df, all_feature_cols, pd.DataFrame(log)

@@ -15,7 +15,7 @@ from .config import (
     NOVA_ORDER,
     PAIR_COLS,
 )
-from .data import LoadedDataset, OpenFoodFactsEDADataLoader, print_dataset_overview
+from .data import LoadedDataset, OpenFoodFactsEDADataLoader, memory_usage_mb, optimize_memory, print_dataset_overview
 from .plots import OpenFoodFactsEDAPlotter
 
 __all__ = [
@@ -35,5 +35,7 @@ __all__ = [
     "compute_high_correlation_pairs",
     "compute_kruskal_summary",
     "impute_with_global_median",
+    "memory_usage_mb",
+    "optimize_memory",
     "print_dataset_overview",
 ]

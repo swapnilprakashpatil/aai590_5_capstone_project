@@ -16,8 +16,14 @@ CLEANED_DATASET_PATH = Path("dataset") / "cleaned.csv"
 # ── Target ───────────────────────────────────────────────────────────────────
 TARGET_COL = "nova_group"
 
-# ── Columns to drop (redundant / leaky) ──────────────────────────────────────
+# ── Columns to drop (redundant / leaky / unused for modelling) ────────────────
 REDUNDANT_COLS = ["sodium_100g"]
+
+# Columns that are loaded for EDA exploration but should not reach the model:
+# - nutrition_grade_fr : derived label (potential leakage with NOVA target)
+# - countries_en       : geographic metadata, not a nutritional signal
+# - pnns_groups_2      : PNNS sub-category, only pnns_groups_1 is encoded
+NON_MODELLING_COLS = ["nutrition_grade_fr", "countries_en", "pnns_groups_2"]
 
 # ── Nutrient cols used after cleaning (sodium removed) ───────────────────────
 NUTRIENT_COLS_CLEAN = [c for c in BASE_NUTRIENT_COLS if c not in REDUNDANT_COLS]
@@ -38,6 +44,7 @@ TOP_ADDITIVE_COUNT = 15
 # ── Columns kept for modelling (set dynamically in the notebook) ─────────────
 ID_COLS = ["code", "product_name", "brands"]
 
+# Raw text columns — used during feature engineering then dropped
 TEXT_COLS = ["ingredients_text", "additives_tags", "categories_en"]
 
 CATEGORY_ENCODE_COLS = ["pnns_groups_1"]

@@ -60,7 +60,6 @@ def cap_outliers(
     upper_quantile: float = 0.99,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     summary: list[dict[str, float | str | int]] = []
-    capped_df = df.copy()
 
     for col in nutrient_cols:
         q1 = df[col].quantile(lower_quantile)
@@ -72,22 +71,21 @@ def cap_outliers(
         outliers = int(((df[col] < lower_bound) | (df[col] > upper_bound)).sum())
         outlier_pct = (outliers / non_null_count * 100) if non_null_count else 0.0
         summary.append({"feature": col, "outliers": outliers, "outlier_pct": round(outlier_pct, 2)})
-        capped_df[col] = df[col].clip(lower=df[col].quantile(lower_quantile), upper=df[col].quantile(upper_quantile))
+        df[col] = df[col].clip(lower=df[col].quantile(lower_quantile), upper=df[col].quantile(upper_quantile))
 
     summary_df = pd.DataFrame(summary).sort_values("outlier_pct", ascending=False)
-    return capped_df, summary_df
+    return df, summary_df
 
 
 def impute_with_global_median(df: pd.DataFrame, nutrient_cols: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    imputed_df = df.copy()
     records: list[dict[str, float | str]] = []
 
     for col in nutrient_cols:
-        global_median = float(imputed_df[col].median())
-        imputed_df[col] = imputed_df[col].fillna(global_median)
+        global_median = float(df[col].median())
+        df[col] = df[col].fillna(global_median)
         records.append({"feature": col, "global_median": round(global_median, 3), "strategy": "global median"})
 
-    return imputed_df, pd.DataFrame(records)
+    return df, pd.DataFrame(records)
 
 
 def build_pairplot_sample(

@@ -2,17 +2,24 @@
 
 Each function performs a single, well-defined cleaning step and returns
 both the cleaned DataFrame and a short summary dict for audit logging.
+
+Memory note: functions modify the DataFrame in-place where possible and
+only copy when the operation requires it (e.g., dropna / drop_duplicates
+always return new objects internally).
 """
 
 from __future__ import annotations
+
+import gc
 
 import numpy as np
 import pandas as pd
 
 from src.eda.analysis import cap_outliers, impute_with_global_median
 from src.eda.config import GRADE_ORDER, NOVA_ORDER
+from src.eda.data import memory_usage_mb, optimize_memory
 
-from .config import REDUNDANT_COLS, TARGET_COL
+from .config import NON_MODELLING_COLS, REDUNDANT_COLS, TARGET_COL
 
 
 # ── Step helpers ─────────────────────────────────────────────────────────────
@@ -24,22 +31,22 @@ def drop_missing_target(
 ) -> tuple[pd.DataFrame, int]:
     """Drop rows where the target variable is missing."""
     n_before = len(df)
-    df_out = df.dropna(subset=[target_col]).copy()
-    return df_out, n_before - len(df_out)
+    df = df.dropna(subset=[target_col])
+    return df, n_before - len(df)
 
 
 def remove_duplicates(df: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
     """Remove exact duplicate rows and barcode-level duplicates."""
     n0 = len(df)
-    df_out = df.drop_duplicates()
-    n_exact = n0 - len(df_out)
+    df = df.drop_duplicates()
+    n_exact = n0 - len(df)
 
-    n1 = len(df_out)
-    if "code" in df_out.columns:
-        df_out = df_out.drop_duplicates(subset=["code"], keep="first")
-    n_barcode = n1 - len(df_out)
+    n1 = len(df)
+    if "code" in df.columns:
+        df = df.drop_duplicates(subset=["code"], keep="first")
+    n_barcode = n1 - len(df)
 
-    return df_out, n_exact, n_barcode
+    return df, n_exact, n_barcode
 
 
 def drop_redundant_columns(
@@ -51,29 +58,35 @@ def drop_redundant_columns(
     return df.drop(columns=to_drop), to_drop
 
 
+def drop_non_modelling_columns(
+    df: pd.DataFrame,
+    cols: list[str] | None = None,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Drop columns not needed for modelling (leaky labels, unused metadata)."""
+    to_drop = [c for c in (cols or NON_MODELLING_COLS) if c in df.columns]
+    return df.drop(columns=to_drop), to_drop
+
+
 def standardize_nutrition_grade(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure nutrition_grade_fr is lowercase and within GRADE_ORDER."""
     if "nutrition_grade_fr" not in df.columns:
         return df
-    df = df.copy()
     grades = df["nutrition_grade_fr"].astype("string").str.strip().str.lower()
     df["nutrition_grade_fr"] = grades.where(grades.isin(GRADE_ORDER))
     return df
 
 
 def standardize_nova_group(df: pd.DataFrame) -> pd.DataFrame:
-    """Coerce nova_group to rounded Int64 values in NOVA_ORDER."""
+    """Coerce nova_group to rounded Int8 values in NOVA_ORDER."""
     if "nova_group" not in df.columns:
         return df
-    df = df.copy()
     nova = pd.to_numeric(df["nova_group"], errors="coerce").round()
-    df["nova_group"] = nova.where(nova.isin(NOVA_ORDER)).astype("Int64")
+    df["nova_group"] = nova.where(nova.isin(NOVA_ORDER)).astype("Int8")
     return df
 
 
 def clean_text_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Fill NaN in free-text columns with empty strings and strip whitespace."""
-    df = df.copy()
     text_cols = ["product_name", "brands", "ingredients_text", "categories_en"]
     for col in text_cols:
         if col in df.columns:
@@ -100,8 +113,9 @@ def run_cleaning_pipeline(
     3. Drop rows missing the target variable
     4. Remove exact- and barcode-level duplicates
     5. Drop redundant columns  (sodium_100g)
-    6. Standardize categorical labels
-    7. Clean free-text columns
+    6. Drop non-modelling columns  (nutrition_grade_fr, countries_en, pnns_groups_2)
+    7. Standardize categorical labels
+    8. Clean free-text columns
 
     Returns
     -------
@@ -134,16 +148,24 @@ def run_cleaning_pipeline(
     nutrient_cols_clean = [c for c in nutrient_cols if c not in dropped_cols]
     log.append({"step": "Drop redundant columns", "detail": ", ".join(dropped_cols) or "none"})
 
-    # 6  Standardize labels
-    df = standardize_nutrition_grade(df)
-    df = standardize_nova_group(df)
-    log.append({"step": "Standardize labels", "detail": "nutrition_grade_fr, nova_group"})
+    # 6  Non-modelling columns (leaky labels, unused metadata)
+    df, dropped_non_model = drop_non_modelling_columns(df)
+    log.append({"step": "Drop non-modelling columns", "detail": ", ".join(dropped_non_model) or "none"})
 
-    # 7  Text cleaning
+    # 7  Standardize labels
+    df = standardize_nova_group(df)
+    log.append({"step": "Standardize labels", "detail": "nova_group"})
+
+    # 8  Text cleaning
     df = clean_text_columns(df)
     log.append({"step": "Clean text columns", "detail": "NaN → empty string, strip whitespace"})
 
     rows_end = len(df)
     log.append({"step": "TOTAL", "detail": f"{rows_start:,} → {rows_end:,} rows ({rows_start - rows_end:,} removed)"})
+
+    # Final memory compaction
+    df = optimize_memory(df)
+    df = df.reset_index(drop=True)
+    gc.collect()
 
     return df, nutrient_cols_clean, pd.DataFrame(log)
