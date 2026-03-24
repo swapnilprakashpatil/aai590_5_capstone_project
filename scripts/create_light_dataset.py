@@ -23,10 +23,12 @@ META_COLS = [
     "pnns_groups_1",
     "pnns_groups_2",
     "nutrition_grade_fr",
+    "nutriscore_score",
     "nova_group",
     "additives_n",
     "additives_tags",
     "ingredients_text",
+    "ingredients_analysis_tags",
 ]
 
 BASE_NUTRIENT_COLS = [
@@ -39,6 +41,11 @@ BASE_NUTRIENT_COLS = [
     "proteins_100g",
     "salt_100g",
     "sodium_100g",
+    "trans-fat_100g",
+    "added-sugars_100g",
+    "monounsaturated-fat_100g",
+    "polyunsaturated-fat_100g",
+    "starch_100g",
 ]
 
 ALL_COLS = META_COLS + BASE_NUTRIENT_COLS
@@ -59,7 +66,7 @@ for chunk in pd.read_csv(
     str(INPUT_PATH),
     sep=sep,
     low_memory=False,
-    usecols=lambda c: c in ALL_COLS or c == "nutriscore_grade",
+    usecols=lambda c: c in ALL_COLS or c in ("nutriscore_grade", "nutriscore_score"),
     on_bad_lines="skip",
     chunksize=CHUNK_SIZE,
 ):

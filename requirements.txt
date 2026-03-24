@@ -8,3 +8,5 @@ missingno>=0.5.2
 jinja2>=3.1.0
 requests>=2.31.0
 python-dotenv>=1.0.0
+pyarrow>=15.0.0
+xgboost>=2.0.0

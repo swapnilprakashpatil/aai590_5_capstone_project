@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -236,8 +237,11 @@ class OpenFoodFactsEDAPlotter:
         plt.show()
 
     def plot_nutrient_distributions(self, df: pd.DataFrame, nutrient_cols: list[str]) -> None:
-        fig, axes = plt.subplots(3, 3, figsize=(18, 13))
-        axes = axes.ravel()
+        n = len(nutrient_cols)
+        ncols = 3
+        nrows = math.ceil(n / ncols)
+        fig, axes = plt.subplots(nrows, ncols, figsize=(18, 4.5 * nrows))
+        axes = np.asarray(axes).ravel()
         for i, col in enumerate(nutrient_cols):
             data = df[col].dropna()
             upper = data.quantile(0.99)
@@ -278,8 +282,11 @@ class OpenFoodFactsEDAPlotter:
             if isinstance(palette, dict):
                 plot_palette = {str(key): value for key, value in palette.items()}
 
-        fig, axes = plt.subplots(3, 3, figsize=(18, 13))
-        axes = axes.ravel()
+        n = len(nutrient_cols)
+        ncols = 3
+        nrows = math.ceil(n / ncols)
+        fig, axes = plt.subplots(nrows, ncols, figsize=(18, 4.5 * nrows))
+        axes = np.asarray(axes).ravel()
         for i, col in enumerate(nutrient_cols):
             upper = plot_df[col].quantile(0.99)
             clipped = plot_df[plot_df[col] <= upper]

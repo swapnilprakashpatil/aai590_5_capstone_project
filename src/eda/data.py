@@ -37,7 +37,7 @@ class OpenFoodFactsEDADataLoader:
     ) -> LoadedDataset:
         dataset_path = Path(dataset_path)
         delimiter = self.detect_delimiter(dataset_path)
-        usecols = lambda col: col in self.required_cols or col == "nutriscore_grade"
+        usecols = lambda col: col in self.required_cols or col in ("nutriscore_grade", "nutriscore_score")
 
         if nrows is None:
             df = pd.read_csv(
@@ -73,7 +73,7 @@ class OpenFoodFactsEDADataLoader:
         if not nutrient_cols:
             raise ValueError("No nutrient columns were loaded. Check the dataset delimiter and schema.")
 
-        for col in nutrient_cols + ["additives_n", "nova_group"]:
+        for col in nutrient_cols + ["additives_n", "nova_group", "nutriscore_score"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
