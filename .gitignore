@@ -131,7 +131,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-
+models
 dataset/*.tsv
 dataset/en.openfoodfacts.org.products.csv
 dataset/*.zip
