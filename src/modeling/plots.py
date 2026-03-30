@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import TYPE_CHECKING, Dict, List
 
 import numpy as np
 import pandas as pd
@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
 
 from .data import ModelResult
+
+if TYPE_CHECKING:
+    from .tuning import TuningResult
 
 
 class ModelPlotter:
@@ -113,5 +116,73 @@ class ModelPlotter:
                         ha="center", va="center", fontsize=10)
         fig.colorbar(im, ax=ax, label="F1 Score")
         ax.set_title("Per-Class F1 Comparison Across Models", fontsize=13)
+        plt.tight_layout()
+        plt.show()
+
+    # -- tuning plots ---------------------------------------------------------
+
+    def plot_optimization_history(self, tuning_result: TuningResult):
+        """Trial F1 values and running best across Optuna optimization."""
+        import optuna  # local import to keep top-level lightweight
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+
+        trial_vals = tuning_result.trial_values
+        best_so_far = tuning_result.best_so_far
+
+        axes[0].plot(range(len(trial_vals)), trial_vals, "o", alpha=0.4,
+                     markersize=4, label="Trial F1")
+        axes[0].plot(range(len(best_so_far)), best_so_far, "-", color="#e74c3c",
+                     linewidth=2, label="Best so far")
+        axes[0].axhline(y=tuning_result.baseline_score, color="gray",
+                        linestyle="--", label="Baseline")
+        axes[0].set_xlabel("Trial")
+        axes[0].set_ylabel("Macro F1")
+        axes[0].set_title("Optimization History")
+        axes[0].legend(fontsize=9)
+
+        try:
+            importance = optuna.importance.get_param_importances(tuning_result.study)
+            params_sorted = sorted(importance.items(), key=lambda x: x[1], reverse=True)
+            names = [p[0] for p in params_sorted]
+            values = [p[1] for p in params_sorted]
+            axes[1].barh(names[:10], values[:10], color="#3498db")
+            axes[1].set_xlabel("Importance")
+            axes[1].set_title("Hyperparameter Importance")
+            axes[1].invert_yaxis()
+        except Exception:
+            axes[1].text(0.5, 0.5, "Importance not available", ha="center", va="center")
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_baseline_vs_tuned(
+        self,
+        baseline_result: ModelResult,
+        tuned_result: ModelResult,
+        labels: List[str],
+    ):
+        """Side-by-side per-class F1 bars for baseline and tuned models."""
+        fig, ax = plt.subplots(figsize=(8, 4))
+        x = np.arange(len(labels))
+        width = 0.35
+
+        baseline_f1 = baseline_result.per_class["F1"].values
+        tuned_f1 = tuned_result.per_class["F1"].values
+
+        bars1 = ax.bar(x - width / 2, baseline_f1, width, label="Baseline", color="#3498db")
+        bars2 = ax.bar(x + width / 2, tuned_f1, width, label="Tuned", color="#e74c3c")
+
+        ax.set_ylabel("F1 Score")
+        ax.set_title("Per-Class F1: Baseline vs. Tuned (Validation)")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels)
+        ax.set_ylim(0, 1.05)
+        ax.legend()
+
+        for bar in (*bars1, *bars2):
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+                    f"{bar.get_height():.3f}", ha="center", va="bottom", fontsize=9)
+
         plt.tight_layout()
         plt.show()
