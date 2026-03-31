@@ -14,8 +14,8 @@ This capstone project focuses on identifying the industrial processing level of 
 
 Core idea:
 
-- Use Open Food Facts tabular data to build and evaluate ML models for food processing tier prediction.
-- Combine data analysis, feature engineering, and model experimentation in notebooks.
+- Use Open Food Facts tabular data to build and evaluate ML models for food processing tier (NOVA group) prediction.
+- Follow a structured pipeline: EDA, feature engineering, multi-model comparison, hyperparameter tuning, and SHAP explainability.
 - Present outputs through a React + Vite frontend prototype.
 
 ## Team and Academic Details
@@ -29,13 +29,46 @@ Core idea:
 - **University:** University of San Diego
 - **School:** Shiley Marcos School of Engineering
 
+## Notebook Pipeline
+
+The project follows a four-notebook pipeline, each building on artifacts from the previous step:
+
+| # | Notebook | Purpose |
+|---|----------|---------|
+| 1 | `01_Exploratory_Data_Analysis.ipynb` | Data quality assessment, target/feature distributions, correlation analysis, outlier detection, missing-data imputation, and cleaned parquet export. |
+| 2 | `02_Feature_Engineering_and_Model_Preperation.ipynb` | Feature selection, engineered ratio features (e.g. sugar/fiber, fat/protein, additives/energy), train/val/test split, scaling, and XGBoost baseline. |
+| 3 | `03_Model_Training_and_Evaluation.ipynb` | Comparative evaluation of Random Forest, XGBoost, MLP, and LightGBM under consistent metrics; XGBoost selected as best candidate (Macro F1 = 0.856). |
+| 4 | `04_Hyperparameter_Tuning_and_Final_Evaluation.ipynb` | Bayesian hyperparameter tuning with Optuna, held-out test evaluation, and SHAP explainability analysis. |
+
+Run notebooks in order — each one saves artifacts consumed by the next.
+
+## Key Results
+
+| Metric | Baseline (Validation) | Tuned (Test) |
+|--------|-----------------------|--------------|
+| Macro F1 | 0.856 | 0.857 |
+| Balanced Accuracy | 0.882 | 0.882 |
+| Weighted F1 | 0.875 | 0.878 |
+| ROC-AUC (OVR) | 0.974 | 0.974 |
+
+**Top SHAP features (overall):** added_sugars_100g, additives_n, additives_per_energy, salt_100g, proteins_100g.
+
+NOVA 3 (processed foods) remains the most challenging class across all models, primarily confused with NOVA 4.
+
 ## Repository Structure
 
-- `01_Exploratory_Data_Analysis.ipynb`: EDA and early analysis workflow.
-- `dataset/`: Input data files used for analysis/modeling.
-- `docs/`: Supporting documentation and project artifacts.
-- `frontend/`: React frontend application.
-- `requirements.txt`: Python dependencies for notebooks and data work.
+- `01_Exploratory_Data_Analysis.ipynb` – EDA and data cleaning.
+- `02_Feature_Engineering_and_Model_Preperation.ipynb` – Feature engineering, splitting, and baseline model.
+- `03_Model_Training_and_Evaluation.ipynb` – Multi-model comparison and selection.
+- `04_Hyperparameter_Tuning_and_Final_Evaluation.ipynb` – Tuning, test evaluation, and SHAP analysis.
+- `dataset/` – Raw and processed data files.
+- `models/` – Saved model artifacts, metrics, SHAP importance, and hyperparameters.
+- `src/eda/` – Reusable EDA modules (data loading, plotting, analysis helpers).
+- `src/modeling/` – Reusable modeling modules (evaluation, tuning, plotting helpers).
+- `scripts/` – Utility scripts (light dataset creation, GitHub project import).
+- `docs/` – Supporting documentation and project artifacts.
+- `frontend/` – React + Vite frontend application.
+- `requirements.txt` – Python dependencies for notebooks and data work.
 
 ## Prerequisites
 
@@ -47,33 +80,20 @@ Core idea:
 
 Source dataset:
 
-- Kaggle snapshot: https://www.kaggle.com/datasets/openfoodfacts/world-food-facts
-- Open Food Facts official export (recommended for latest fields, including NOVA): https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
+- Open Food Facts official export: https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
 
-1. Open the Kaggle link above and download the dataset as a ZIP file.
-2. Extract the downloaded files.
-3. Copy the required TSV files into this repository's `dataset/` folder.
-4. Confirm the primary file path exists before running notebooks:
-
-```text
-dataset/en.openfoodfacts.org.products.tsv
-```
-
-Optional (Kaggle CLI):
-
-```powershell
-kaggle datasets download -d openfoodfacts/world-food-facts -p dataset
-```
-
-Then unzip into `dataset/` so the TSV files are directly available there.
-
-Optional (direct Open Food Facts download):
+1. Download the dataset:
 
 ```powershell
 Invoke-WebRequest -Uri "https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz" -OutFile "dataset/en.openfoodfacts.org.products.csv.gz"
 ```
 
-Then decompress and place the extracted file in `dataset/` before loading it in notebooks.
+2. Decompress and place the extracted file in `dataset/`.
+3. Confirm the primary file path exists before running notebooks:
+
+```text
+dataset/en.openfoodfacts.org.products.tsv
+```
 
 ## Using the Notebooks
 
@@ -96,7 +116,7 @@ pip install -r requirements.txt
 jupyter notebook
 ```
 
-4. Open `01_Exploratory_Data_Analysis.ipynb` and run cells in order.
+4. Open notebooks in order, starting with `01_Exploratory_Data_Analysis.ipynb`, and run cells sequentially. Each notebook saves artifacts (cleaned data, splits, models, metrics) consumed by the next.
 
 Notes:
 
@@ -142,9 +162,7 @@ npm run preview
 ### Dataset Information
 
 - **Name:** Open Food Facts - World Food Facts
-- **Source:**
-  - Kaggle snapshot: https://www.kaggle.com/datasets/openfoodfacts/world-food-facts
-  - Open Food Facts official export: https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
+- **Source:** https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
 - **Primary file used in this project:** `dataset/en.openfoodfacts.org.products.tsv`
 - **Format:** Tab-separated values (TSV)
 - **Granularity:** One row per product
