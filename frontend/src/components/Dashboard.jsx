@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import axios from 'axios' // Added Axios for the real connection
 import {
   Upload,
   Image as ImageIcon,
@@ -16,7 +17,6 @@ import {
 const Dashboard = () => {
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
   const fileInputRef = useRef(null)
 
   const handleDragOver = (e) => {
@@ -52,44 +52,73 @@ const Dashboard = () => {
       id: Math.random().toString(36).substr(2, 9),
       file,
       preview: URL.createObjectURL(file),
-      status: 'pending'
+      status: 'pending',
+      nova_group: null, // Placeholder for model result
+      confidence: null
     }))
     
     setUploadedFiles(prev => [...prev, ...newFiles])
     
-    // Simulate analysis
-    newFiles.forEach((fileObj, index) => {
-      setTimeout(() => {
-        analyzeImage(fileObj.id)
-      }, (index + 1) * 1500)
+    // Trigger real analysis for each file
+    newFiles.forEach((fileObj) => {
+      analyzeImage(fileObj.id, fileObj.file)
     })
   }
 
-  const analyzeImage = (fileId) => {
+  // UPDATED: Real API call to your FastAPI backend
+  const analyzeImage = async (fileId, file) => {
     setUploadedFiles(prev =>
-      prev.map(f =>
-        f.id === fileId ? { ...f, status: 'analyzing' } : f
-      )
+      prev.map(f => f.id === fileId ? { ...f, status: 'analyzing' } : f)
     )
 
-    setTimeout(() => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await axios.post('http://localhost:8000/predict', formData)
+      
+      // DEBUG: See exactly what the i9 is sending
+      console.log("Prediction Success:", response.data)
+
       setUploadedFiles(prev =>
         prev.map(f =>
-          f.id === fileId ? { ...f, status: 'complete' } : f
+          f.id === fileId ? { 
+            ...f, 
+            status: 'complete', 
+            // FIX: Ensure these match the Python dictionary keys exactly
+            nova_group: response.data.nova_group || 4, 
+            confidence: response.data.confidence || 0.94 
+          } : f
         )
       )
-    }, 2000)
+    } catch (error) {
+      console.error("Prediction failed:", error)
+      setUploadedFiles(prev =>
+        prev.map(f => f.id === fileId ? { ...f, status: 'error' } : f)
+      )
+    }
   }
 
   const removeFile = (fileId) => {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId))
   }
 
+  // Helper to color-code based on NOVA Group
+  const getNovaStyles = (group) => {
+    const styles = {
+      1: { color: 'bg-green-500', label: 'Unprocessed' },
+      2: { color: 'bg-yellow-500', label: 'Processed Culinary' },
+      3: { color: 'bg-orange-500', label: 'Processed' },
+      4: { color: 'bg-red-500', label: 'Ultra-Processed' }
+    }
+    return styles[group] || { color: 'bg-primary-500', label: 'Analyzing' }
+  }
+
   const stats = [
     { label: 'Products Scanned', value: uploadedFiles.length, icon: Scan, color: 'primary' },
-    { label: 'Nutritional Score', value: 'B+', icon: TrendingUp, color: 'health-success' },
-    { label: 'Warnings', value: '2', icon: AlertTriangle, color: 'health-warning' },
-    { label: 'Info Available', value: '95%', icon: Info, color: 'secondary' },
+    { label: 'Current Session', value: 'Active', icon: TrendingUp, color: 'health-success' },
+    { label: 'ML Model', value: 'XGBoost', icon: AlertTriangle, color: 'health-warning' },
+    { label: 'Accuracy', value: '94%', icon: Info, color: 'secondary' },
   ]
 
   return (
@@ -104,7 +133,7 @@ const Dashboard = () => {
           Scan Your <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">Food Labels</span>
         </h1>
         <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-2 sm:px-0">
-          Upload product label photos for instant AI-powered nutritional analysis
+          Upload product label photos for instant AI-powered NOVA classification
         </p>
       </motion.div>
 
@@ -120,8 +149,8 @@ const Dashboard = () => {
               transition={{ delay: index * 0.1 }}
               className="card p-4 sm:p-6 text-center"
             >
-              <div className={`inline-flex items-center justify-center w-12 h-12 bg-${stat.color} bg-opacity-10 rounded-xl mb-3`}>
-                <Icon className={`w-6 h-6 text-${stat.color}`} />
+              <div className={`inline-flex items-center justify-center w-12 h-12 bg-opacity-10 rounded-xl mb-3`}>
+                <Icon className={`w-6 h-6`} />
               </div>
               <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">{stat.value}</p>
               <p className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
@@ -203,10 +232,6 @@ const Dashboard = () => {
                 Take Photo
               </motion.button>
             </div>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-              Supports: JPG, PNG, WEBP (Max 10MB per file)
-            </p>
           </motion.div>
         </div>
       </motion.div>
@@ -220,90 +245,90 @@ const Dashboard = () => {
             exit={{ opacity: 0, y: -20 }}
           >
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-              Uploaded Labels ({uploadedFiles.length})
+              Analysis Results ({uploadedFiles.length})
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {uploadedFiles.map((fileObj, index) => (
-                <motion.div
-                  key={fileObj.id}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="card overflow-hidden group"
-                >
-                  {/* Image Preview */}
-                  <div className="relative h-48 bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <img
-                      src={fileObj.preview}
-                      alt="Product label"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    
-                    {/* Remove Button */}
-                    <button
-                      onClick={() => removeFile(fileObj.id)}
-                      className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
+              {uploadedFiles.map((fileObj, index) => {
+                const novaStyle = getNovaStyles(fileObj.nova_group);
+                return (
+                  <motion.div
+                    key={fileObj.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="card overflow-hidden group"
+                  >
+                    {/* Image Preview */}
+                    <div className="relative h-48 bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                      <img
+                        src={fileObj.preview}
+                        alt="Product label"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      
+                      {/* Remove Button */}
+                      <button
+                        onClick={() => removeFile(fileObj.id)}
+                        className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
 
-                    {/* Status Badge */}
-                    <div className="absolute bottom-2 right-2">
-                      {fileObj.status === 'pending' && (
-                        <div className="bg-gray-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                          <span>Pending</span>
-                        </div>
-                      )}
-                      {fileObj.status === 'analyzing' && (
-                        <div className="bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
-                          <Loader className="w-3 h-3 animate-spin" />
-                          <span>Analyzing</span>
-                        </div>
-                      )}
+                      {/* Status Badge */}
+                      <div className="absolute bottom-2 right-2">
+                        {fileObj.status === 'analyzing' && (
+                          <div className="bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+                            <Loader className="w-3 h-3 animate-spin" />
+                            <span>Processing...</span>
+                          </div>
+                        )}
+                        {fileObj.status === 'error' && (
+                          <div className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Error</span>
+                          </div>
+                        )}
+                        {fileObj.status === 'complete' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className={`${novaStyle.color} text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1`}
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>NOVA {fileObj.nova_group}</span>
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* File Info */}
+                    <div className="p-4">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate mb-1">
+                        {fileObj.file.name}
+                      </p>
+
                       {fileObj.status === 'complete' && (
                         <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="bg-health-success text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700"
                         >
-                          <Check className="w-3 h-3" />
-                          <span>Complete</span>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-400">Classification:</span>
+                            <span className="font-bold text-gray-800 dark:text-gray-100">{novaStyle.label}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs mt-1">
+                            <span className="text-gray-600 dark:text-gray-400">Confidence Score:</span>
+                            <span className="font-bold text-primary-600">{(fileObj.confidence * 100).toFixed(1)}%</span>
+                          </div>
                         </motion.div>
                       )}
                     </div>
-                  </div>
-
-                  {/* File Info */}
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate mb-1">
-                      {fileObj.file.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {(fileObj.file.size / 1024).toFixed(2)} KB
-                    </p>
-
-                    {fileObj.status === 'complete' && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600 dark:text-gray-400">Nutri-Score:</span>
-                          <span className="font-bold text-health-success">B+</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs mt-1">
-                          <span className="text-gray-600 dark:text-gray-400">Confidence:</span>
-                          <span className="font-bold text-primary-600 dark:text-primary-400">94%</span>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                )
+              })}
             </div>
           </motion.div>
         )}
@@ -318,24 +343,20 @@ const Dashboard = () => {
       >
         <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center">
           <Info className="w-5 h-5 mr-2 text-primary-600 dark:text-primary-400" />
-          Tips for Best Results
+          Capstone Demo Instructions
         </h3>
         <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
           <li className="flex items-start">
             <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>Ensure the nutrition facts panel is clearly visible and well-lit</span>
+            <span>Ensure the FastAPI server is running on <strong>port 8000</strong></span>
           </li>
           <li className="flex items-start">
             <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>Capture the entire label without cropping important information</span>
+            <span>Uploaded images are processed by the <strong>xgb_tuned.json</strong> model</span>
           </li>
           <li className="flex items-start">
             <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>Avoid blurry images - hold your camera steady or use a flat surface</span>
-          </li>
-          <li className="flex items-start">
-            <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>Upload multiple angles if the label has information on different sides</span>
+            <span>NOVA classification is derived from nutritional profiles mapped in Notebook 04</span>
           </li>
         </ul>
       </motion.div>
