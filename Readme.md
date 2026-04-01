@@ -157,6 +157,19 @@ npm run build
 npm run preview
 ```
 
+## Running the backend 
+
+Install the following: 
+```powershell
+pip install fastapi uvicorn xgboost pandas scikit-learn joblib pillow python-multipart
+```
+
+Launch API
+```powershell
+python main.py
+```
+
+
 ## Dataset Information and Data Dictionary
 
 ### Dataset Information
