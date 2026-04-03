@@ -11,7 +11,7 @@ Write-Host "   NutriVision AI - Full Stack Launcher"  -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ── Locate Python venv ────────────────────────────────────────────────────────
+# Locate Python venv
 $PYTHON = Join-Path $ROOT ".venv\Scripts\python.exe"
 if (-Not (Test-Path $PYTHON)) {
     # Fall back to system python
@@ -26,7 +26,7 @@ else {
     Write-Host "[OK] Python  : $PYTHON" -ForegroundColor Green
 }
 
-# ── Check Node / npm ──────────────────────────────────────────────────────────
+# Check Node / npm
 $NODE = (Get-Command node -ErrorAction SilentlyContinue).Source
 $NPM = (Get-Command npm  -ErrorAction SilentlyContinue).Source
 if (-Not $NODE -or -Not $NPM) {
@@ -36,7 +36,7 @@ if (-Not $NODE -or -Not $NPM) {
 Write-Host "[OK] Node.js : $(node --version)" -ForegroundColor Green
 Write-Host "[OK] npm     : $(npm --version)"  -ForegroundColor Green
 
-# ── Install frontend dependencies if needed ───────────────────────────────────
+# Install frontend dependencies if needed
 $FRONTEND = Join-Path $ROOT "frontend"
 if (-Not (Test-Path (Join-Path $FRONTEND "node_modules"))) {
     Write-Host ""
@@ -54,21 +54,21 @@ if (-Not (Test-Path (Join-Path $FRONTEND "node_modules"))) {
 Write-Host ""
 Write-Host "------------------------------------------" -ForegroundColor DarkGray
 Write-Host "  Backend  → http://localhost:8000"        -ForegroundColor White
-Write-Host "  Frontend → http://localhost:5173"        -ForegroundColor White
+Write-Host "  Frontend → http://localhost:3000"        -ForegroundColor White
 Write-Host "  API Docs → http://localhost:8000/docs"   -ForegroundColor White
 Write-Host "------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Starting both servers... Press Ctrl+C to stop." -ForegroundColor Yellow
 Write-Host ""
 
-# ── Launch backend as a background job ───────────────────────────────────────
+# Launch backend as a background job
 $backendJob = Start-Job -Name "NutriVision-Backend" -ScriptBlock {
     param($root, $python)
     Set-Location $root
     & $python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 } -ArgumentList $ROOT, $PYTHON
 
-# ── Launch frontend as a background job ──────────────────────────────────────
+# Launch frontend as a background job
 $frontendJob = Start-Job -Name "NutriVision-Frontend" -ScriptBlock {
     param($frontend)
     Set-Location $frontend
@@ -79,7 +79,7 @@ Write-Host "[STARTED] Backend  job id: $($backendJob.Id)"  -ForegroundColor Gree
 Write-Host "[STARTED] Frontend job id: $($frontendJob.Id)" -ForegroundColor Green
 Write-Host ""
 
-# ── Stream output from both jobs until Ctrl+C ────────────────────────────────
+# Stream output from both jobs until Ctrl+C
 try {
     while ($true) {
         Receive-Job -Job $backendJob  -ErrorAction SilentlyContinue |

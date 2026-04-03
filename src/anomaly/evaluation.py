@@ -7,7 +7,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.svm import OneClassSVM
 
 
-# ── Low-level helpers ─────────────────────────────────────────────────────────
+# Low-level helpers
 
 def reconstruction_error(model: MLPRegressor, X: np.ndarray) -> np.ndarray:
     """Per-sample MSE between the original feature vector and its reconstruction."""
@@ -21,7 +21,7 @@ def minmax_norm(arr: np.ndarray) -> np.ndarray:
     return (arr - lo) / (hi - lo + 1e-12)
 
 
-# ── Scoring class ─────────────────────────────────────────────────────────────
+# Scoring class
 
 class AnomalyScorer:
     """
@@ -41,7 +41,7 @@ class AnomalyScorer:
         self.ae_percentile = ae_percentile
         self.ae_threshold: float | None = None
 
-    # ── Per-model scoring ─────────────────────────────────────────────────────
+    # Per-model scoring
 
     def fit_ae_threshold(
         self, autoencoder: MLPRegressor, X_nova1_train: np.ndarray
@@ -97,7 +97,7 @@ class AnomalyScorer:
         self._print_report("One-Class SVM", flags)
         return scores, flags
 
-    # ── Ensemble ──────────────────────────────────────────────────────────────
+    # Ensemble
 
     def build_ensemble(
         self,
@@ -145,7 +145,7 @@ class AnomalyScorer:
         self._print_ensemble_report(df)
         return df
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # Helpers
 
     @staticmethod
     def _print_report(name: str, flags: np.ndarray) -> None:

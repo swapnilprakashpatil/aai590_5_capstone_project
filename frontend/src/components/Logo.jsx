@@ -79,12 +79,12 @@ const Logo = ({ className = "w-10 h-10" }) => {
         </linearGradient>
       </defs>
 
-      {/* ── Label background ── */}
+      {/* Label background */}
       <rect x="5" y={Y0} width="90" height={Y1 - Y0} rx="3" fill="white" />
       <rect x="5" y={Y0} width="90" height={Y1 - Y0} rx="3"
             stroke="#111" strokeWidth="1.5" />
 
-      {/* ── Header: "Nutrition Facts" ── */}
+      {/* Header: "Nutrition Facts" */}
       <ScanText y={14} fontSize={11} fontWeight="900">Nutrition</ScanText>
       <ScanText y={22} fontSize={9}  fontWeight="900">Facts</ScanText>
 
@@ -95,7 +95,7 @@ const Logo = ({ className = "w-10 h-10" }) => {
         transition={{ ...loop, times: [0, 0.17, 0.22, 0.90, 0.93, 0.96, 1] }}
       />
 
-      {/* ── Calories row ── */}
+      {/* Calories row */}
       <ScanText y={34} fontSize={6.5} fontWeight="700" anchor="start" x={8}>Calories</ScanText>
       <ScanText y={34} fontSize={9}   fontWeight="900" anchor="end"   x={92}>230</ScanText>
 
@@ -109,7 +109,7 @@ const Logo = ({ className = "w-10 h-10" }) => {
       {/* % Daily Value header */}
       <ScanText y={43} fontSize={4.2} fontWeight="700" anchor="end" x={92}>% Daily Value*</ScanText>
 
-      {/* ── Nutrient rows with alternating thin rules ── */}
+      {/* Nutrient rows with alternating thin rules */}
       {rows.map(([y, label, val, bold], i) => {
         const ruleKf = scanKeyframes(y - 5)
         return (
@@ -133,11 +133,11 @@ const Logo = ({ className = "w-10 h-10" }) => {
         transition={{ ...loop, times: [0, 0.75, 0.80, 0.90, 0.93, 0.96, 1] }}
       />
 
-      {/* ── Footer fine-print ── */}
+      {/* Footer fine-print */}
       <ScanText y={80} fontSize={3.8} fontWeight="400">* Percent Daily Values based on a</ScanText>
       <ScanText y={85} fontSize={3.8} fontWeight="400">2,000 calorie diet.</ScanText>
 
-      {/* ── Brand tag ── */}
+      {/* Brand tag */}
       <ScanText y={94} fontSize={5} fontWeight="900">NutriScan AI</ScanText>
 
       {/* ══ Animated scan line ══ */}
@@ -157,7 +157,7 @@ const Logo = ({ className = "w-10 h-10" }) => {
         transition={loop}
       />
 
-      {/* ── Corner bracket focus marks ── */}
+      {/* Corner bracket focus marks */}
       {[
         `M5,13 L5,${Y0} L15,${Y0}`,
         `M95,13 L95,${Y0} L85,${Y0}`,

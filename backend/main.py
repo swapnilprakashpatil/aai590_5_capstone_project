@@ -2,40 +2,46 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import logging
+import traceback
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Allow imports from the project root (src package)
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import uvicorn
 import joblib
-<<<<<<< Updated upstream
-import pandas as pd
-import json
-import os
-from PIL import Image
-import io
-from pathlib import Path
-import xgboost as xgb
-=======
 import io
 import re
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageEnhance
 from xgboost import XGBClassifier
->>>>>>> Stashed changes
 
 from src.anomaly.inference import predict_nova_and_anomaly
 
 app = FastAPI(title="NutriVision AI", version="1.0.0")
 
-<<<<<<< Updated upstream
-# enables requests for React to talk to FastAPI
-=======
->>>>>>> Stashed changes
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.url}: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,116 +49,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-<<<<<<< Updated upstream
-# get the directory where main.py is located
-# this solves path issues for different terminals (gitbash, powershell, etc..)
-BASE_DIR = Path(__file__).resolve().parent
+# Load all trained artifacts once at startup
+BACKEND_MODELS_DIR = ROOT / "backend" / "models"
 
-# define paths relative to BASE_DIR
-MODEL_PATH = BASE_DIR / "models" / "final_model.json"
-SCALER_PATH = BASE_DIR / "models" / "final_scaler.joblib"
-FEATURES_PATH = BASE_DIR / "models" / "features.json"
-
-# initialize global variables
-model = None
-scaler = None
-feature_names = None
-
-# verify our paths do exists for the models in our backend
-for p in [MODEL_PATH, SCALER_PATH, FEATURES_PATH]:
-    if not p.exists():
-        print(f"CRITICAL ERROR: File missing at {p}")
-    else:
-        print(f"Confirmed: {p.name} exists.")
-
-# load block
-try:
-    # load XGBoost Model using native loader
-    # convert the Path object to a string for library compatibility
-    model = xgb.XGBClassifier()
-    model.load_model(str(MODEL_PATH))
-    
-    # load Scaler
-    scaler = joblib.load(str(SCALER_PATH))
-    
-    # load feature Names
-    with open(FEATURES_PATH, "r") as f:
-        feature_names = json.load(f)
-        
-    print("SUCCESS: All ML Artifacts loaded into memory")
-
-except Exception as e:
-    print(f"LOAD FAILURE: {type(e).__name__} - {e}")
-    print(f"Search path attempted: {MODEL_PATH}")
-
-@app.get("/")
-async def root():
-    return {"message": "NOVA Classification API is Running"}
-
-@app.post("/predict")
-async def predict_food(file: UploadFile = File(...)):
-    try:
-        # keep the file reading logic for the demo
-        content = await file.read()
-        _ = Image.open(io.BytesIO(content))
-        
-        # DYNAMIC FEATURE MAPPING
-        # create a dictionary where every key is a feature from our JSON
-        # and every value is initialized to 0.0.
-        input_dict = {name: 0.0 for name in feature_names}
-        
-        # matching the snackbar image inputs, will need to change this logic 
-        try:
-            # Common Open Food Facts naming conventions
-            if "energy-kcal_100g" in input_dict: input_dict["energy-kcal_100g"] = 320.0
-            if "fat_100g" in input_dict: input_dict["fat_100g"] = 19.0
-            if "sugars_100g" in input_dict: input_dict["sugars_100g"] = 18.0
-            if "proteins_100g" in input_dict: input_dict["proteins_100g"] = 13.0
-        except:
-            pass
-
-        # passing a list containing a dictionary
-        # Explicitly passing columns=feature_names ensures the (1, 20) shape
-        input_df = pd.DataFrame([input_dict], columns=feature_names)
-        
-        # verify the shape in the terminal to ensure it matches
-        print(f"Input Shape: {input_df.shape}") 
-
-        # scaling and prediction
-        scaled_data = scaler.transform(input_df)
-        prediction = model.predict(scaled_data)
-        
-        # adjust 0-3 index to 1-4 NOVA group
-        # prediction is an array, we take the first element
-        nova_result = int(prediction) + 1
-        
-        # we send multiple keys to ensure the frontend finds one it likes
-        return {
-            "success": True,
-            "nova_group": int(nova_result),
-            "confidence": 0.94,
-            "filename": file.filename,
-            "message": f"Classified as NOVA {nova_result}"
-        }
-
-    except Exception as e:
-        print(f"Prediction Error: {e}")
-        return {"success": False, "error": str(e)}
-=======
-# ── Load all trained artifacts once at startup ────────────────────────────────
-MODELS_DIR = ROOT / "models"
-
-_anomaly = joblib.load(MODELS_DIR / "anomaly_models.joblib")
+# Load anomaly detection models from backend/models (exported from notebook 05)
+_anomaly = joblib.load(BACKEND_MODELS_DIR / "anomaly_models.joblib")
 AUTOENCODER  = _anomaly["autoencoder"]
 ISO_FOREST   = _anomaly["isolation_forest"]
 OC_SVM       = _anomaly["one_class_svm"]
 AE_THRESHOLD = float(_anomaly["ae_threshold"])
 FEATURE_NAMES: list[str] = _anomaly["feature_names"]
 
-SCALER = joblib.load(MODELS_DIR / "standard_scaler.joblib")
+# Load the final scaler from backend/models (exported from notebook 04)
+SCALER = joblib.load(BACKEND_MODELS_DIR / "final_scaler.joblib")
 
+# Load the tuned XGBoost model from backend/models (exported from notebook 04)
 NOVA_CLASSIFIER = XGBClassifier()
-NOVA_CLASSIFIER.load_model(MODELS_DIR / "xgb_baseline.json")
+NOVA_CLASSIFIER.load_model(BACKEND_MODELS_DIR / "xgb_tuned.json")
 
 # NutriScore grade thresholds (food category A-E mapping)
 _GRADE_THRESHOLDS = [(-10, "A"), (2, "B"), (10, "C"), (18, "D"), (40, "E")]
@@ -174,7 +87,7 @@ NOVA_COLORS = {1: "green", 2: "blue", 3: "orange", 4: "red"}
 
 _EPS = 1e-5
 
-# ── OCR: lazy-loaded EasyOCR reader ──────────────────────────────────────────
+# OCR: lazy-loaded EasyOCR reader
 _ocr_reader = None
 
 def _get_ocr_reader():
@@ -288,7 +201,7 @@ def _reconstruct_lines(detections: list[tuple]) -> list[str]:
     return result
 
 
-# ── Normalisation helpers ─────────────────────────────────────────────────────
+# Normalisation helpers
 
 def _clean(text: str) -> str:
     """Normalise OCR artefacts: fix common letter↔digit confusion, collapse spaces."""
@@ -314,7 +227,7 @@ def _first_float(s: str) -> float | None:
     return float(m.group(1)) if m else None
 
 
-# ── Field keyword maps ────────────────────────────────────────────────────────
+# Field keyword maps
 # Each field maps to a list of keyword phrases (all lowercase).
 # A line "matches" a field if any keyword appears in it.
 _FIELD_KEYWORDS: dict[str, list[str]] = {
@@ -356,7 +269,7 @@ def _match_field(line: str) -> str | None:
     return None
 
 
-# ── Two-strategy parser ───────────────────────────────────────────────────────
+# Two-strategy parser
 
 def _extract_value_from_line(line: str, field: str) -> float | None:
     """
@@ -410,7 +323,7 @@ def _parse_lines(lines: list[str]) -> tuple[dict[str, float], dict[str, bool]]:
 
     cleaned = [_clean(ln) for ln in lines]
 
-    # ── Pass 1: line-pair matching ─────────────────────────────────────────────
+    # Pass 1: line-pair matching
     for i, line in enumerate(cleaned):
         field = _match_field(line)
         if field and field not in values:
@@ -422,7 +335,7 @@ def _parse_lines(lines: list[str]) -> tuple[dict[str, float], dict[str, bool]]:
                 values[field] = val
                 auto_flags[field] = True
 
-    # ── Pass 2: full-text flexible regex (catch what line-pair missed) ─────────
+    # Pass 2: full-text flexible regex (catch what line-pair missed)
     full = " ".join(cleaned)
 
     _P = r"(\d{1,6}(?:\.\d{1,4})?)"  # float group
@@ -477,7 +390,6 @@ def _parse_lines(lines: list[str]) -> tuple[dict[str, float], dict[str, bool]]:
             rf"starch\b.{{0,10}}?{_P}",
         ],
     }
->>>>>>> Stashed changes
 
     for field, patterns in FULLTEXT_PATTERNS.items():
         if field in values:
@@ -498,8 +410,12 @@ def _parse_lines(lines: list[str]) -> tuple[dict[str, float], dict[str, bool]]:
 
 def _build_feature_vector(fields: dict) -> np.ndarray:
     """
-    Compute all 20 model features from the raw nutrition values submitted by the user.
+    Compute all 15 model features from the raw nutrition values submitted by the user.
     Derived ratios use the same epsilon-safe formulas as Notebook 02.
+    
+    Features match the training data:
+    - 11 raw nutritional values
+    - 4 derived ratios
     """
     energy     = fields["energy_100g"]
     fat        = fields["fat_100g"]
@@ -510,24 +426,20 @@ def _build_feature_vector(fields: dict) -> np.ndarray:
     salt       = fields["salt_100g"]
     sat_fat    = fields["saturated_fat_100g"]
     additives  = fields["additives_n"]
-    trans_fat  = fields["trans_fat_100g"]
     add_sugars = fields["added_sugars_100g"]
-    mono_fat   = fields["monounsaturated_fat_100g"]
-    poly_fat   = fields["polyunsaturated_fat_100g"]
-    starch     = fields["starch_100g"]
     nutriscore = fields["nutriscore_score"]
 
+    # Derived features (4 ratios)
     sugar_fiber_ratio    = sugars / (fiber + _EPS)
-    fat_protein_ratio    = fat   / (proteins + _EPS)
+    fat_protein_ratio    = fat / (proteins + _EPS)
     additives_per_energy = additives / (energy + 1)
-    trans_fat_ratio      = trans_fat / (fat + _EPS)
-    unsaturated_fat_ratio = (mono_fat + poly_fat) / (fat + _EPS)
+    saturated_fat_ratio  = sat_fat / (fat + _EPS)
 
+    # Feature order must match the training data exactly
     row = [
         energy, fat, carbs, sugars, fiber, proteins, salt, sat_fat,
-        additives, trans_fat, add_sugars, mono_fat, poly_fat, starch,
-        nutriscore, sugar_fiber_ratio, fat_protein_ratio,
-        additives_per_energy, trans_fat_ratio, unsaturated_fat_ratio,
+        additives, add_sugars, nutriscore,
+        sugar_fiber_ratio, fat_protein_ratio, additives_per_energy, saturated_fat_ratio,
     ]
     return np.array(row, dtype=float).reshape(1, -1)
 
@@ -582,75 +494,85 @@ async def analyze_food(
     starch_100g:              float = Form(0.0),
     nutriscore_score:         float = Form(0.0),
 ):
-    # Validate file is an image
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
+    try:
+        logger.info(f"Received analyze request for file: {file.filename}")
+        
+        # Validate file is an image
+        if not file.content_type.startswith("image/"):
+            logger.warning(f"Invalid content type: {file.content_type}")
+            raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
-    fields = {
-        "energy_100g":              energy_100g,
-        "fat_100g":                 fat_100g,
-        "carbohydrates_100g":       carbohydrates_100g,
-        "sugars_100g":              sugars_100g,
-        "fiber_100g":               fiber_100g,
-        "proteins_100g":            proteins_100g,
-        "salt_100g":                salt_100g,
-        "saturated_fat_100g":       saturated_fat_100g,
-        "additives_n":              additives_n,
-        "trans_fat_100g":           trans_fat_100g,
-        "added_sugars_100g":        added_sugars_100g,
-        "monounsaturated_fat_100g": monounsaturated_fat_100g,
-        "polyunsaturated_fat_100g": polyunsaturated_fat_100g,
-        "starch_100g":              starch_100g,
-        "nutriscore_score":         nutriscore_score,
-    }
+        fields = {
+            "energy_100g":              energy_100g,
+            "fat_100g":                 fat_100g,
+            "carbohydrates_100g":       carbohydrates_100g,
+            "sugars_100g":              sugars_100g,
+            "fiber_100g":               fiber_100g,
+            "proteins_100g":            proteins_100g,
+            "salt_100g":                salt_100g,
+            "saturated_fat_100g":       saturated_fat_100g,
+            "additives_n":              additives_n,
+            "trans_fat_100g":           trans_fat_100g,
+            "added_sugars_100g":        added_sugars_100g,
+            "monounsaturated_fat_100g": monounsaturated_fat_100g,
+            "polyunsaturated_fat_100g": polyunsaturated_fat_100g,
+            "starch_100g":              starch_100g,
+            "nutriscore_score":         nutriscore_score,
+        }
+        
+        logger.debug(f"Processing nutrition fields: {fields}")
 
-    X_raw = _build_feature_vector(fields)
+        X_raw = _build_feature_vector(fields)
+        logger.debug(f"Feature vector shape: {X_raw.shape}")
 
-    results = predict_nova_and_anomaly(
-        X_raw           = X_raw,
-        scaler          = SCALER,
-        nova_classifier = NOVA_CLASSIFIER,
-        autoencoder     = AUTOENCODER,
-        ae_threshold    = AE_THRESHOLD,
-        iso_forest      = ISO_FOREST,
-        oc_svm          = OC_SVM,
-    )
+        results = predict_nova_and_anomaly(
+            X_raw           = X_raw,
+            scaler          = SCALER,
+            nova_classifier = NOVA_CLASSIFIER,
+            autoencoder     = AUTOENCODER,
+            ae_threshold    = AE_THRESHOLD,
+            iso_forest      = ISO_FOREST,
+            oc_svm          = OC_SVM,
+        )
 
-    row = results.iloc[0]
-    nova_group = int(row["nova_pred"])
+        row = results.iloc[0]
+        nova_group = int(row["nova_pred"])
+        
+        logger.info(f"Analysis complete: NOVA group {nova_group}, anomaly={bool(row['is_anomalous'])}")
 
-    return {
-        "nova_group":       nova_group,
-        "nova_description": NOVA_DESCRIPTIONS[nova_group],
-        "nova_color":       NOVA_COLORS[nova_group],
-        "nova_confidence":  round(float(row["nova_confidence"]) * 100, 1),
-        "nutriscore_grade": _nutriscore_grade(nutriscore_score),
-        "anomaly": {
-            "is_anomalous":   bool(row["is_anomalous"]),
-            "votes":          int(row["anomaly_votes"]),
-            "ensemble_score": round(float(row["ensemble_score"]) * 100, 1),
-            "ae_score":       round(float(row["ae_score"]), 6),
-            "if_score":       round(float(row["if_score"]), 6),
-            "svm_score":      round(float(row["svm_score"]), 6),
-        },
-        "nutrition_per_100g": {
-            "energy_kcal":   round(energy_100g / 4.184, 1),
-            "energy_kj":     energy_100g,
-            "fat":           fat_100g,
-            "saturated_fat": saturated_fat_100g,
-            "carbohydrates": carbohydrates_100g,
-            "sugars":        sugars_100g,
-            "fiber":         fiber_100g,
-            "proteins":      proteins_100g,
-            "salt":          salt_100g,
-        },
-    }
+        return {
+            "nova_group":       nova_group,
+            "nova_description": NOVA_DESCRIPTIONS[nova_group],
+            "nova_color":       NOVA_COLORS[nova_group],
+            "nova_confidence":  round(float(row["nova_confidence"]) * 100, 1),
+            "nutriscore_grade": _nutriscore_grade(nutriscore_score),
+            "anomaly": {
+                "is_anomalous":   bool(row["is_anomalous"]),
+                "votes":          int(row["anomaly_votes"]),
+                "ensemble_score": round(float(row["ensemble_score"]) * 100, 1),
+                "ae_score":       round(float(row["ae_score"]), 6),
+                "if_score":       round(float(row["if_score"]), 6),
+                "svm_score":      round(float(row["svm_score"]), 6),
+            },
+            "nutrition_per_100g": {
+                "energy_kcal":   round(energy_100g / 4.184, 1),
+                "energy_kj":     energy_100g,
+                "fat":           fat_100g,
+                "saturated_fat": saturated_fat_100g,
+                "carbohydrates": carbohydrates_100g,
+                "sugars":        sugars_100g,
+                "fiber":         fiber_100g,
+                "proteins":      proteins_100g,
+                "salt":          salt_100g,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in analyze_food: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":
-<<<<<<< Updated upstream
-    # server configuration for localhost deployment
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-=======
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
->>>>>>> Stashed changes
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

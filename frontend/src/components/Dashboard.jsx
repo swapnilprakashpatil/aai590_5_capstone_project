@@ -1,6 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import axios from 'axios' // Added Axios for the real connection
 import {
   Upload,
   Camera,
@@ -15,10 +14,13 @@ import {
   RotateCcw,
   Sparkles,
   PencilLine,
+  ZoomIn,
+  X,
+  Search,
 } from 'lucide-react'
 import { analyzeLabel, extractNutrition } from '../api'
 
-// ── Nutrition field definitions ───────────────────────────────────────────────
+// Nutrition field definitions
 const CORE_FIELDS = [
   { key: 'energy_100g',        label: 'Energy (kJ)',          unit: 'kJ',   required: true,  placeholder: '1500', hint: 'Total energy per 100g/100ml in kilojoules' },
   { key: 'fat_100g',           label: 'Total Fat',            unit: 'g',    required: true,  placeholder: '5.0' },
@@ -40,18 +42,57 @@ const ADVANCED_FIELDS = [
   { key: 'nutriscore_score',         label: 'Nutri-Score (raw score)', unit: '',   placeholder: '0', hint: 'Nutri-Score numeric value (−15 to +40). Leave 0 if unknown.' },
 ]
 
-const DEFAULT_VALUES = Object.fromEntries(
-  [...CORE_FIELDS, ...ADVANCED_FIELDS].map(f => [f.key, ''])
-)
+const DEFAULT_VALUES = {
+  ...Object.fromEntries(
+    [...CORE_FIELDS, ...ADVANCED_FIELDS].map(f => [f.key, ''])
+  ),
+  additives_n: '0', // Default to 0 since most labels don't list additives count
+}
 
-// ── NOVA colour helpers ───────────────────────────────────────────────────────
+// NOVA colour helpers
 const NOVA_BG   = { 1: 'bg-emerald-500', 2: 'bg-blue-500',   3: 'bg-amber-500',  4: 'bg-red-500'   }
 const NOVA_TEXT = { 1: 'text-emerald-600', 2: 'text-blue-600', 3: 'text-amber-600', 4: 'text-red-600' }
 const NOVA_BORDER = { 1: 'border-emerald-400', 2: 'border-blue-400', 3: 'border-amber-400', 4: 'border-red-400' }
 
 const NUTRISCORE_BG = { A:'bg-emerald-500', B:'bg-lime-500', C:'bg-yellow-400', D:'bg-orange-500', E:'bg-red-600' }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// NOVA Classification Information
+const NOVA_INFO = [
+  {
+    group: 1,
+    title: 'Unprocessed or Minimally Processed',
+    color: 'emerald',
+    description: 'Natural foods obtained directly from plants or animals with no added substances.',
+    examples: 'Fresh fruits, vegetables, eggs, meat, fish, milk, nuts, legumes, grains',
+    details: 'These are the edible parts of plants (seeds, fruits, leaves, stems, roots) or from animals (muscle, offal, eggs, milk), after minimal processing like removal of inedible parts, drying, crushing, grinding, fractioning, filtering, roasting, boiling, pasteurization, refrigeration, freezing, or other methods that do not add substances.',
+  },
+  {
+    group: 2,
+    title: 'Processed Culinary Ingredients',
+    color: 'blue',
+    description: 'Substances extracted from Group 1 foods or from nature, used in cooking.',
+    examples: 'Oils, butter, sugar, salt, honey, vinegar, starches',
+    details: 'These are substances obtained directly from Group 1 foods or from nature by processes that include pressing, refining, grinding, milling, and drying. They are used in homes and restaurants to prepare, season and cook Group 1 foods.',
+  },
+  {
+    group: 3,
+    title: 'Processed Foods',
+    color: 'amber',
+    description: 'Products made by adding Group 2 ingredients to Group 1 foods.',
+    examples: 'Canned vegetables, cheese, fresh bread, cured meat, wine, beer',
+    details: 'These are relatively simple products made by adding sugar, oil, salt or other Group 2 ingredients to Group 1 foods. Most have two or three ingredients. Processes include various preservation or cooking methods, and, in the case of breads and cheese, non-alcoholic fermentation.',
+  },
+  {
+    group: 4,
+    title: 'Ultra-Processed Foods',
+    color: 'red',
+    description: 'Industrial formulations typically with 5 or more ingredients and various additives.',
+    examples: 'Soft drinks, packaged snacks, instant noodles, mass-produced bread, cookies, ice cream, processed meats',
+    details: 'Ultra-processed foods are industrial formulations made mostly or entirely from substances extracted from foods (oils, fats, sugar, starch, proteins), derived from food constituents (hydrogenated fats, modified starch), or synthesized from other organic substances. They often contain little or no whole food and include additives (preservatives, stabilizers, emulsifiers, sweeteners, colorants, flavors).',
+  },
+]
+
+// Sub-components
 
 function NutritionField({ field, value, onChange, autoDetected = false }) {
   return (
@@ -93,6 +134,194 @@ function NutritionField({ field, value, onChange, autoDetected = false }) {
         `}
         required={field.required}
       />
+    </div>
+  )
+}
+
+// ImageMagnifier component with hover magnification and click-to-zoom
+function ImageMagnifier({ src, alt = '', className = '', maxHeight = 288 }) {
+  const [showMagnifier, setShowMagnifier] = useState(false)
+  const [magnifierEnabled, setMagnifierEnabled] = useState(true)
+  const [showZoomModal, setShowZoomModal] = useState(false)
+  const [[x, y], setXY] = useState([0, 0])
+  const [[imgWidth, imgHeight], setSize] = useState([0, 0])
+  const [mouseOnImage, setMouseOnImage] = useState(false)
+
+  const magnifierSize = 150
+  const zoomLevel = 2.5
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showZoomModal) {
+        setShowZoomModal(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showZoomModal])
+
+  // Early return if no src provided (after all hooks to comply with Rules of Hooks)
+  if (!src) {
+    return null
+  }
+
+  const handleMouseEnter = (e) => {
+    const elem = e.currentTarget
+    const { width, height } = elem.getBoundingClientRect()
+    setSize([width, height])
+    setMouseOnImage(true)
+  }
+
+  const handleMouseMove = (e) => {
+    const elem = e.currentTarget
+    const { top, left } = elem.getBoundingClientRect()
+    const x = e.clientX - left
+    const y = e.clientY - top
+    setXY([x, y])
+  }
+
+  const handleMouseLeave = () => {
+    setMouseOnImage(false)
+  }
+
+  const handleImageClick = () => {
+    if (!magnifierEnabled) {
+      setShowZoomModal(true)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Control buttons */}
+      <div className="flex gap-2 justify-end">
+        <button
+          type="button"
+          onClick={() => setMagnifierEnabled(!magnifierEnabled)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            magnifierEnabled
+              ? 'bg-primary-500 text-white shadow-md'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+          }`}
+        >
+          <Search className="w-3.5 h-3.5" />
+          Magnifier {magnifierEnabled ? 'ON' : 'OFF'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowZoomModal(true)}
+          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all flex items-center gap-1.5"
+        >
+          <ZoomIn className="w-3.5 h-3.5" />
+          Full Zoom
+        </button>
+      </div>
+
+      {/* Image container */}
+      <div className="card overflow-hidden relative">
+        <div
+          className="relative"
+          onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleImageClick}
+          style={{ cursor: magnifierEnabled ? 'none' : 'zoom-in' }}
+        >
+          <img
+            src={src}
+            alt={alt}
+            style={{ maxHeight: `${maxHeight}px` }}
+            className={`w-full object-contain bg-gray-50 dark:bg-gray-800 ${className || ''}`}
+          />
+
+          {/* Magnifier lens */}
+          {magnifierEnabled && mouseOnImage && (
+            <div
+              style={{
+                position: 'absolute',
+                pointerEvents: 'none',
+                height: `${magnifierSize}px`,
+                width: `${magnifierSize}px`,
+                top: `${y - magnifierSize / 2}px`,
+                left: `${x - magnifierSize / 2}px`,
+                opacity: '1',
+                border: '3px solid #3b82f6',
+                backgroundColor: 'white',
+                backgroundImage: `url('${src}')`,
+                backgroundRepeat: 'no-repeat',
+                borderRadius: '50%',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                backgroundSize: `${imgWidth * zoomLevel}px ${imgHeight * zoomLevel}px`,
+                backgroundPositionX: `${-x * zoomLevel + magnifierSize / 2}px`,
+                backgroundPositionY: `${-y * zoomLevel + magnifierSize / 2}px`,
+              }}
+            />
+          )}
+
+          {/* Crosshair when magnifier is on */}
+          {magnifierEnabled && mouseOnImage && (
+            <div
+              style={{
+                position: 'absolute',
+                pointerEvents: 'none',
+                top: `${y}px`,
+                left: `${x}px`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              <div className="w-0.5 h-4 bg-primary-500 absolute -top-6 left-1/2 -translate-x-1/2" />
+              <div className="w-0.5 h-4 bg-primary-500 absolute top-2 left-1/2 -translate-x-1/2" />
+              <div className="h-0.5 w-4 bg-primary-500 absolute top-1/2 -translate-y-1/2 -left-6" />
+              <div className="h-0.5 w-4 bg-primary-500 absolute top-1/2 -translate-y-1/2 left-2" />
+            </div>
+          )}
+        </div>
+
+        {/* Hint overlay when magnifier is off */}
+        {!magnifierEnabled && (
+          <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-all flex items-center justify-center pointer-events-none">
+            <div className="opacity-0 hover:opacity-100 bg-white/90 dark:bg-gray-800/90 text-gray-800 dark:text-gray-100 px-3 py-2 rounded-lg text-sm font-medium transition-opacity flex items-center gap-2 shadow-lg">
+              <ZoomIn className="w-4 h-4" /> Click to zoom
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Zoom Modal */}
+      <AnimatePresence>
+        {showZoomModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowZoomModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-6xl max-h-[90vh] w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowZoomModal(false)}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors flex items-center gap-2"
+              >
+                <X className="w-6 h-6" />
+                <span className="text-sm">Close (Esc)</span>
+              </button>
+              <div className="bg-white dark:bg-gray-900 rounded-lg overflow-auto max-h-[90vh] shadow-2xl">
+                <img
+                  src={src}
+                  alt={`${alt} (zoomed)`}
+                  className="w-full h-auto"
+                  style={{ maxHeight: '85vh' }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -146,7 +375,12 @@ function ResultsPanel({ result, imagePreview, onReset }) {
         <div className="space-y-4">
           {imagePreview && (
             <div className="card overflow-hidden">
-              <img src={imagePreview} alt="Food label" className="w-full object-contain max-h-64 bg-gray-50 dark:bg-gray-800" />
+              <img 
+                src={imagePreview} 
+                alt="Food label" 
+                style={{ maxHeight: '256px' }}
+                className="w-full object-contain bg-gray-50 dark:bg-gray-800" 
+              />
             </div>
           )}
 
@@ -258,24 +492,29 @@ function ResultsPanel({ result, imagePreview, onReset }) {
   )
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
+// Main Dashboard
 
 const Dashboard = () => {
   // steps: 'upload' | 'extracting' | 'form' | 'analyzing' | 'results'
   const [step, setStep] = useState('upload')
+  const [uploadMode, setUploadMode] = useState('sample') // 'upload' or 'sample'
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
-<<<<<<< Updated upstream
-=======
   const [nutrition, setNutrition] = useState(DEFAULT_VALUES)
   const [autoFields, setAutoFields] = useState({})    // fields detected by OCR
   const [ocrFieldCount, setOcrFieldCount] = useState(0)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
->>>>>>> Stashed changes
   const fileInputRef = useRef(null)
+
+  // Sample images from /public/labels folder
+  const SAMPLE_IMAGES = Array.from({ length: 10 }, (_, i) => ({
+    id: i + 1,
+    url: `${import.meta.env.BASE_URL}labels/${i + 1}.webp`,
+    name: `Sample ${i + 1}`,
+  }))
 
   const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true) }
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false) }
@@ -292,57 +531,6 @@ const Dashboard = () => {
     if (file) acceptImage(file)
   }
 
-<<<<<<< Updated upstream
-  const processFiles = (files) => {
-    const newFiles = files.map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
-      file,
-      preview: URL.createObjectURL(file),
-      status: 'pending',
-      nova_group: null, // Placeholder for model result
-      confidence: null
-    }))
-    
-    setUploadedFiles(prev => [...prev, ...newFiles])
-    
-    // Trigger real analysis for each file
-    newFiles.forEach((fileObj) => {
-      analyzeImage(fileObj.id, fileObj.file)
-    })
-  }
-
-  // UPDATED: Real API call to your FastAPI backend
-  const analyzeImage = async (fileId, file) => {
-    setUploadedFiles(prev =>
-      prev.map(f => f.id === fileId ? { ...f, status: 'analyzing' } : f)
-    )
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    try {
-      const response = await axios.post('http://localhost:8000/predict', formData)
-      
-      // DEBUG: See exactly what the i9 is sending
-      console.log("Prediction Success:", response.data)
-
-      setUploadedFiles(prev =>
-        prev.map(f =>
-          f.id === fileId ? { 
-            ...f, 
-            status: 'complete', 
-            // FIX: Ensure these match the Python dictionary keys exactly
-            nova_group: response.data.nova_group || 4, 
-            confidence: response.data.confidence || 0.94 
-          } : f
-        )
-      )
-    } catch (error) {
-      console.error("Prediction failed:", error)
-      setUploadedFiles(prev =>
-        prev.map(f => f.id === fileId ? { ...f, status: 'error' } : f)
-      )
-=======
   const acceptImage = async (file) => {
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
@@ -366,6 +554,42 @@ const Dashboard = () => {
       if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
     } catch (_err) {
       // OCR failed — still open form, user enters manually
+      setAutoFields({})
+      setOcrFieldCount(0)
+    }
+
+    setStep('form')
+  }
+
+  const handleSampleImageSelect = async (sampleUrl) => {
+    setError(null)
+    setStep('extracting')
+
+    try {
+      // Fetch the sample image and convert to File object
+      const response = await fetch(sampleUrl)
+      const blob = await response.blob()
+      const filename = sampleUrl.split('/').pop()
+      const file = new File([blob], filename, { type: blob.type })
+      
+      setImageFile(file)
+      setImagePreview(sampleUrl)
+
+      // Run OCR on the sample image
+      const ocr = await extractNutrition(file)
+      const prefilled = { ...DEFAULT_VALUES }
+      if (ocr.extracted) {
+        Object.entries(ocr.extracted).forEach(([k, v]) => {
+          prefilled[k] = String(v)
+        })
+      }
+      setNutrition(prefilled)
+      setAutoFields(ocr.auto_fields || {})
+      setOcrFieldCount(ocr.fields_found || 0)
+      
+      const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
+      if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
+    } catch (_err) {
       setAutoFields({})
       setOcrFieldCount(0)
     }
@@ -402,7 +626,6 @@ const Dashboard = () => {
     } catch (err) {
       setError(`Analysis failed: ${err.message}`)
       setStep('form')
->>>>>>> Stashed changes
     }
   }
 
@@ -419,53 +642,91 @@ const Dashboard = () => {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-<<<<<<< Updated upstream
-  // Helper to color-code based on NOVA Group
-  const getNovaStyles = (group) => {
-    const styles = {
-      1: { color: 'bg-green-500', label: 'Unprocessed' },
-      2: { color: 'bg-yellow-500', label: 'Processed Culinary' },
-      3: { color: 'bg-orange-500', label: 'Processed' },
-      4: { color: 'bg-red-500', label: 'Ultra-Processed' }
-    }
-    return styles[group] || { color: 'bg-primary-500', label: 'Analyzing' }
-  }
-
-  const stats = [
-    { label: 'Products Scanned', value: uploadedFiles.length, icon: Scan, color: 'primary' },
-    { label: 'Current Session', value: 'Active', icon: TrendingUp, color: 'health-success' },
-    { label: 'ML Model', value: 'XGBoost', icon: AlertTriangle, color: 'health-warning' },
-    { label: 'Accuracy', value: '94%', icon: Info, color: 'secondary' },
-=======
-  // ── Render helpers ──────────────────────────────────────────────────────────
+  // Render helpers
 
   const STEPS = [
     { id: 'upload',     label: '1. Upload' },
     { id: 'extracting', label: '2. OCR Scan' },
     { id: 'form',       label: '3. Review' },
     { id: 'results',    label: '4. Results' },
->>>>>>> Stashed changes
   ]
 
   const stepIndex = (id) => STEPS.findIndex(s => s.id === id)
   const activeIdx = stepIndex(step === 'analyzing' ? 'form' : step)
 
   const StepIndicator = () => (
-    <div className="flex items-center gap-2 mb-6 flex-wrap">
-      {STEPS.map((s, i) => (
-        <div key={s.id} className="flex items-center gap-2">
-          <div className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-            i === activeIdx
-              ? 'bg-primary-600 text-white'
-              : i < activeIdx
-                ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
-          }`}>
-            {s.label}
-          </div>
-          {i < STEPS.length - 1 && <ChevronRight className="w-4 h-4 text-gray-400" />}
+    <div className="mb-8">
+      <div className="relative">
+        {/* Progress line background */}
+        <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700" 
+             style={{ marginLeft: '2rem', marginRight: '2rem' }} />
+        
+        {/* Progress line filled */}
+        <div 
+          className="absolute top-5 left-0 h-1 bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-500 ease-out"
+          style={{ 
+            marginLeft: '2rem',
+            width: `calc(${(activeIdx / (STEPS.length - 1)) * 100}% - ${activeIdx === 0 ? 2 : 4}rem)`
+          }} 
+        />
+        
+        {/* Steps */}
+        <div className="relative flex justify-between">
+          {STEPS.map((s, i) => {
+            const isActive = i === activeIdx
+            const isCompleted = i < activeIdx
+            const stepNumber = i + 1
+            
+            return (
+              <div key={s.id} className="flex flex-col items-center" style={{ flex: 1 }}>
+                {/* Step circle */}
+                <motion.div
+                  initial={false}
+                  animate={{
+                    scale: isActive ? 1.1 : 1,
+                  }}
+                  className={`
+                    w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                    border-4 transition-all duration-300 relative z-10
+                    ${isActive 
+                      ? 'bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-500/50' 
+                      : isCompleted
+                        ? 'bg-primary-500 border-primary-500 text-white'
+                        : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400'
+                    }
+                  `}
+                >
+                  {isCompleted ? (
+                    <CheckCircle className="w-5 h-5" />
+                  ) : (
+                    stepNumber
+                  )}
+                </motion.div>
+                
+                {/* Step label */}
+                <div className="mt-3 text-center">
+                  <p className={`text-sm font-semibold transition-colors ${
+                    isActive 
+                      ? 'text-primary-600 dark:text-primary-400' 
+                      : isCompleted
+                        ? 'text-primary-700 dark:text-primary-300'
+                        : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    {s.label.split('. ')[1] || s.label}
+                  </p>
+                  {isActive && (
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: '100%' }}
+                      className="h-0.5 bg-primary-600 dark:bg-primary-400 mt-1 rounded-full"
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
-      ))}
+      </div>
     </div>
   )
 
@@ -479,122 +740,14 @@ const Dashboard = () => {
             Food Label
           </span>
         </h1>
-<<<<<<< Updated upstream
-        <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-2 sm:px-0">
-          Upload product label photos for instant AI-powered NOVA classification
-        </p>
-      </motion.div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon
-          return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="card p-4 sm:p-6 text-center"
-            >
-              <div className={`inline-flex items-center justify-center w-12 h-12 bg-opacity-10 rounded-xl mb-3`}>
-                <Icon className={`w-6 h-6`} />
-              </div>
-              <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">{stat.value}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
-            </motion.div>
-          )
-        })}
-      </div>
-
-      {/* Upload Section */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`
-            card p-6 sm:p-8 md:p-12 text-center cursor-pointer transition-all duration-300
-            ${isDragging ? 'border-4 border-primary-500 bg-primary-50 dark:bg-primary-900/20 scale-105' : 'border-2 border-dashed border-gray-300 dark:border-gray-600'}
-          `}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileInput}
-            className="hidden"
-          />
-
-          <motion.div
-            animate={{
-              y: isDragging ? -10 : 0,
-              scale: isDragging ? 1.1 : 1
-            }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full mb-4 sm:mb-6 shadow-lg">
-              {isDragging ? (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <Upload className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
-                </motion.div>
-              ) : (
-                <Camera className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
-              )}
-            </div>
-
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
-              {isDragging ? 'Drop your images here!' : 'Upload Product Labels'}
-            </h3>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
-              Drag & drop images or click to browse
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="btn-primary w-full sm:w-auto"
-                type="button"
-              >
-                <Upload className="w-5 h-5 mr-2 inline" />
-                Choose Files
-              </motion.button>
-              <span className="text-sm text-gray-500 hidden sm:inline">or</span>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="btn-secondary w-full sm:w-auto"
-                type="button"
-              >
-                <Camera className="w-5 h-5 mr-2 inline" />
-                Take Photo
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
-      </motion.div>
-
-      {/* Uploaded Files Grid */}
-=======
-        <p className="text-base text-gray-600 dark:text-gray-300">
-          Upload a food label photo — the AI reads the nutrition facts automatically and classifies the product.
+        <p className="text-base text-gray-600 dark:text-gray-300 mb-3">
+          Upload a food label photo and the AI reads the nutrition facts automatically and classifies the product.
         </p>
       </motion.div>
 
       <StepIndicator />
 
       {/* Error banner */}
->>>>>>> Stashed changes
       <AnimatePresence>
         {error && (
           <motion.div
@@ -603,180 +756,209 @@ const Dashboard = () => {
             exit={{ opacity: 0, height: 0 }}
             className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm"
           >
-<<<<<<< Updated upstream
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-              Analysis Results ({uploadedFiles.length})
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {uploadedFiles.map((fileObj, index) => {
-                const novaStyle = getNovaStyles(fileObj.nova_group);
-                return (
-                  <motion.div
-                    key={fileObj.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="card overflow-hidden group"
-                  >
-                    {/* Image Preview */}
-                    <div className="relative h-48 bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                      <img
-                        src={fileObj.preview}
-                        alt="Product label"
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                      
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => removeFile(fileObj.id)}
-                        className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      {/* Status Badge */}
-                      <div className="absolute bottom-2 right-2">
-                        {fileObj.status === 'analyzing' && (
-                          <div className="bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
-                            <Loader className="w-3 h-3 animate-spin" />
-                            <span>Processing...</span>
-                          </div>
-                        )}
-                        {fileObj.status === 'error' && (
-                          <div className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            <span>Error</span>
-                          </div>
-                        )}
-                        {fileObj.status === 'complete' && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className={`${novaStyle.color} text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1`}
-                          >
-                            <Check className="w-3 h-3" />
-                            <span>NOVA {fileObj.nova_group}</span>
-                          </motion.div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* File Info */}
-                    <div className="p-4">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate mb-1">
-                        {fileObj.file.name}
-                      </p>
-
-                      {fileObj.status === 'complete' && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700"
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600 dark:text-gray-400">Classification:</span>
-                            <span className="font-bold text-gray-800 dark:text-gray-100">{novaStyle.label}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs mt-1">
-                            <span className="text-gray-600 dark:text-gray-400">Confidence Score:</span>
-                            <span className="font-bold text-primary-600">{(fileObj.confidence * 100).toFixed(1)}%</span>
-                          </div>
-                        </motion.div>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-=======
             <AlertTriangle className="w-5 h-5 flex-shrink-0" />
             {error}
->>>>>>> Stashed changes
           </motion.div>
         )}
       </AnimatePresence>
 
-<<<<<<< Updated upstream
-      {/* Quick Tips */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="card p-6 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border-2 border-primary-200 dark:border-primary-700"
-      >
-        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center">
-          <Info className="w-5 h-5 mr-2 text-primary-600 dark:text-primary-400" />
-          Capstone Demo Instructions
-        </h3>
-        <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-          <li className="flex items-start">
-            <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>Ensure the FastAPI server is running on <strong>port 8000</strong></span>
-          </li>
-          <li className="flex items-start">
-            <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>Uploaded images are processed by the <strong>xgb_tuned.json</strong> model</span>
-          </li>
-          <li className="flex items-start">
-            <span className="text-primary-600 dark:text-primary-400 mr-2">•</span>
-            <span>NOVA classification is derived from nutritional profiles mapped in Notebook 04</span>
-          </li>
-        </ul>
-      </motion.div>
-=======
-      {/* ── Step 1: Upload ── */}
+      {/* Step 1: Upload */}
       <AnimatePresence mode="wait">
         {step === 'upload' && (
           <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`
-                card p-12 text-center cursor-pointer transition-all duration-300 select-none
-                ${isDragging
-                  ? 'border-4 border-primary-500 bg-primary-50 dark:bg-primary-900/20 scale-105'
-                  : 'border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'}
-              `}
-            >
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full mb-6 shadow-lg mx-auto">
-                {isDragging ? (
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-                    <Upload className="w-12 h-12 text-white" />
-                  </motion.div>
-                ) : (
-                  <Camera className="w-12 h-12 text-white" />
-                )}
-              </div>
-              <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
-                {isDragging ? 'Drop your label here!' : 'Upload Food Label'}
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">Drag & drop or click to browse — JPG, PNG, WEBP</p>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn-primary mx-auto" type="button">
-                <Upload className="w-5 h-5 mr-2 inline" /> Choose Photo
-              </motion.button>
+            
+            {/* Mode Toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setUploadMode('upload')}
+                className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                  uploadMode === 'upload'
+                    ? 'bg-primary-500 text-white shadow-lg'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Upload className="w-5 h-5 inline mr-2" />
+                Upload Image
+              </button>
+              <button
+                onClick={() => setUploadMode('sample')}
+                className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                  uploadMode === 'sample'
+                    ? 'bg-primary-500 text-white shadow-lg'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Camera className="w-5 h-5 inline mr-2" />
+                Try Sample
+              </button>
             </div>
+
+            {/* Upload Section */}
+            {uploadMode === 'upload' && (
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`
+                  card p-12 text-center cursor-pointer transition-all duration-300 select-none
+                  ${isDragging
+                    ? 'border-4 border-primary-500 bg-primary-50 dark:bg-primary-900/20 scale-105'
+                    : 'border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'}
+                `}
+              >
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+                <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full mb-6 shadow-lg mx-auto">
+                  {isDragging ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                      <Upload className="w-12 h-12 text-white" />
+                    </motion.div>
+                  ) : (
+                    <Camera className="w-12 h-12 text-white" />
+                  )}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+                  {isDragging ? 'Drop your label here!' : 'Upload Food Label'}
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-6">Drag & drop or click to browse — JPG, PNG, WEBP</p>
+                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn-primary mx-auto" type="button">
+                  <Upload className="w-5 h-5 mr-2 inline" /> Choose Photo
+                </motion.button>
+              </div>
+            )}
+
+            {/* Sample Images Section */}
+            {uploadMode === 'sample' && (
+              <div className="card p-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">
+                  Select a Sample Food Label
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {SAMPLE_IMAGES.map((sample) => (
+                    <motion.div
+                      key={sample.id}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleSampleImageSelect(sample.url)}
+                      className="cursor-pointer group"
+                    >
+                      <div className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 group-hover:border-primary-500 transition-all shadow-sm group-hover:shadow-lg">
+                        <img
+                          src={sample.url}
+                          alt={sample.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                          <div className="opacity-0 group-hover:opacity-100 bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-semibold transition-opacity">
+                            Select
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-center text-xs text-gray-600 dark:text-gray-400 mt-2">{sample.name}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Tips */}
             <div className="card p-5 mt-4 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border border-primary-200 dark:border-primary-700">
               <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-2 flex items-center gap-2">
                 <Info className="w-4 h-4 text-primary-500" /> Tips for Best Results
               </h4>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm text-gray-600 dark:text-gray-300">
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm text-gray-600 dark:text-gray-300 mb-4">
                 <li>• Photograph the <strong>Nutrition Facts</strong> panel clearly</li>
                 <li>• Ensure all text is readable and well-lit</li>
                 <li>• Include the <strong>ingredients list</strong> for the additive count</li>
                 <li>• Values are <strong>auto-extracted</strong> — review before submitting</li>
               </ul>
+
+              {/* NOVA Classification Info */}
+              <div className="mt-6 pt-6 border-t border-primary-200 dark:border-primary-700">
+                <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-3 text-lg flex items-center gap-2">
+                  <Info className="w-5 h-5 text-primary-600" />
+                  NOVA Classification System
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                  Classification of foods based on their <strong>distance from nature</strong>
+                </p>
+
+                {/* NOVA Image */}
+                <div className="mb-5 rounded-lg overflow-hidden bg-white dark:bg-gray-800 p-4">
+                  <img 
+                    src={`${import.meta.env.BASE_URL}nova-classification.png`}
+                    alt="NOVA Classification 4 Groups" 
+                    className="w-full h-auto rounded-lg"
+                  />
+                </div>
+
+                {/* NOVA Groups */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {NOVA_INFO.map((nova) => {
+                    const colorClasses = {
+                      emerald: {
+                        border: 'border-l-4 border-emerald-500',
+                        bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+                        badge: 'bg-emerald-500 text-white',
+                      },
+                      blue: {
+                        border: 'border-l-4 border-blue-500',
+                        bg: 'bg-blue-50 dark:bg-blue-900/20',
+                        badge: 'bg-blue-500 text-white',
+                      },
+                      amber: {
+                        border: 'border-l-4 border-amber-500',
+                        bg: 'bg-amber-50 dark:bg-amber-900/20',
+                        badge: 'bg-amber-500 text-white',
+                      },
+                      red: {
+                        border: 'border-l-4 border-red-500',
+                        bg: 'bg-red-50 dark:bg-red-900/20',
+                        badge: 'bg-red-500 text-white',
+                      },
+                    }
+                    const colors = colorClasses[nova.color]
+                    
+                    return (
+                      <div
+                        key={nova.group}
+                        className={`${colors.border} ${colors.bg} p-3 rounded-lg`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className={`${colors.badge} w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0`}>
+                            {nova.group}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-1">
+                              {nova.title}
+                            </h5>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              {nova.description}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              <strong>Examples:</strong> {nova.examples}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Health Impact Note */}
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                  <p className="text-xs text-gray-700 dark:text-gray-300">
+                    <strong>💡 Health Impact:</strong> Research suggests that Group 1 and 2 foods are associated with better health outcomes,
+                    while Group 4 (ultra-processed) foods have been linked to increased risk of obesity, cardiovascular disease, and other health conditions
+                    when consumed in excess.
+                  </p>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
 
-        {/* ── Step 2: OCR extracting spinner ── */}
+        {/* Step 2: OCR extracting spinner */}
         {step === 'extracting' && (
           <motion.div
             key="extracting"
@@ -798,16 +980,20 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* ── Step 3: Review Form ── */}
+        {/* Step 3: Review Form */}
         {(step === 'form' || step === 'analyzing') && (
           <motion.div key="form" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Image preview column */}
                 <div className="space-y-3">
-                  <div className="card overflow-hidden">
-                    <img src={imagePreview} alt="Food label" className="w-full object-contain max-h-72 bg-gray-50 dark:bg-gray-800" />
-                  </div>
+                  {imagePreview && (
+                    <ImageMagnifier 
+                      src={imagePreview} 
+                      alt="Food label" 
+                      maxHeight={288}
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => setStep('upload')}
@@ -916,14 +1102,13 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* ── Step 3: Results ── */}
+        {/* Step 4: Results */}
         {step === 'results' && result && (
           <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <ResultsPanel result={result} imagePreview={imagePreview} onReset={handleReset} />
           </motion.div>
         )}
       </AnimatePresence>
->>>>>>> Stashed changes
     </div>
   )
 }

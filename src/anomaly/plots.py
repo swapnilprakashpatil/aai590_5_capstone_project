@@ -17,7 +17,7 @@ class AnomalyPlotter:
     nova_colors  = NOVA_COLORS
     model_colors = MODEL_COLORS
 
-    # ── Baseline exploration ──────────────────────────────────────────────────
+    # Baseline exploration
 
     def plot_feature_distributions(
         self,
@@ -59,7 +59,7 @@ class AnomalyPlotter:
         plt.tight_layout()
         plt.show()
 
-    # ── Autoencoder plots ─────────────────────────────────────────────────────
+    # Autoencoder plots
 
     def plot_loss_curve(self, autoencoder: MLPRegressor) -> None:
         """Training loss curve from ``MLPRegressor.loss_curve_``."""
@@ -162,7 +162,7 @@ class AnomalyPlotter:
         print("Top 5 features with highest reconstruction error for NOVA 4:")
         print(feat_err_df["NOVA 4"].sort_values(ascending=False).head().to_string())
 
-    # ── Ensemble plots ────────────────────────────────────────────────────────
+    # Ensemble plots
 
     def plot_cross_model_anomaly_rates(
         self,
@@ -287,7 +287,7 @@ class AnomalyPlotter:
         plt.tight_layout()
         plt.show()
 
-    # ── Analysis plots ────────────────────────────────────────────────────────
+    # Analysis plots
 
     def plot_feature_profile(
         self,

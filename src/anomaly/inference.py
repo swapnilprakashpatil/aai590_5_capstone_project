@@ -54,12 +54,12 @@ def predict_nova_and_anomaly(
     """
     X_scaled = scaler.transform(X_raw)
 
-    # ── Use Case 1: NOVA classification ──────────────────────────────────────
+    # Use Case 1: NOVA classification
     nova_probs = nova_classifier.predict_proba(X_scaled)   # shape (n, 4)
     nova_pred  = nova_probs.argmax(axis=1) + 1             # 1-indexed NOVA group
     nova_conf  = nova_probs.max(axis=1)
 
-    # ── Use Case 2: Anomaly scoring ───────────────────────────────────────────
+    # Use Case 2: Anomaly scoring
     ae_s   = reconstruction_error(autoencoder, X_scaled)
     if_s   = -iso_forest.decision_function(X_scaled)
     svm_s  = -oc_svm.decision_function(X_scaled)

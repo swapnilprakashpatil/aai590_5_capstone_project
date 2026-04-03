@@ -1,0 +1,38 @@
+{
+  "original_features": [
+    "energy_100g",
+    "fat_100g",
+    "carbohydrates_100g",
+    "sugars_100g",
+    "fiber_100g",
+    "proteins_100g",
+    "salt_100g",
+    "saturated_fat_100g",
+    "additives_n",
+    "added_sugars_100g",
+    "nutriscore_score"
+  ],
+  "engineered_features": [
+    "sugar_fiber_ratio",
+    "fat_protein_ratio",
+    "additives_per_energy",
+    "saturated_fat_ratio"
+  ],
+  "total_samples": 223792,
+  "train_samples": 134275,
+  "val_samples": 44758,
+  "test_samples": 44759,
+  "features_removed_in_eda": [
+    "sodium_100g",
+    "trans_fat_100g",
+    "monounsaturated_fat_100g",
+    "polyunsaturated_fat_100g",
+    "starch_100g"
+  ],
+  "nova_class_distribution": {
+    "1": 26882,
+    "2": 8218,
+    "3": 44950,
+    "4": 143742
+  }
+}
