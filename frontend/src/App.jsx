@@ -27,7 +27,13 @@ function App() {
   }
 
   return (
-    <Router basename={import.meta.env.BASE_URL}>
+    <Router 
+      basename={import.meta.env.BASE_URL}
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
         <Navbar darkMode={darkMode} toggleTheme={toggleTheme} />
         <motion.main
