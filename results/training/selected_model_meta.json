@@ -1,16 +1,16 @@
 {
-  "selected_model": "Random Forest",
+  "selected_model": "XGBoost",
   "primary_metric": "Macro F1",
-  "primary_metric_value": 0.8602,
-  "balanced_accuracy": 0.8789,
-  "weighted_f1": 0.8806,
+  "primary_metric_value": 0.8605,
+  "balanced_accuracy": 0.8898,
+  "weighted_f1": 0.8739,
   "all_models": [
     "Random Forest",
     "XGBoost",
     "MLP",
     "LightGBM"
   ],
-  "feature_count": 15,
+  "feature_count": 13,
   "n_classes": 4,
   "original_features": [
     "energy_100g",
@@ -22,14 +22,12 @@
     "salt_100g",
     "saturated_fat_100g",
     "additives_n",
-    "added_sugars_100g",
-    "nutriscore_score"
+    "added_sugars_100g"
   ],
   "engineered_features": [
     "sugar_fiber_ratio",
     "fat_protein_ratio",
-    "additives_per_energy",
-    "saturated_fat_ratio"
+    "additives_per_energy"
   ],
   "features_removed_in_eda": [
     "sodium_100g",
