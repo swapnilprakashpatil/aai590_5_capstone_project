@@ -9,9 +9,7 @@
   "saturated_fat_100g",
   "additives_n",
   "added_sugars_100g",
-  "nutriscore_score",
   "sugar_fiber_ratio",
   "fat_protein_ratio",
-  "additives_per_energy",
-  "saturated_fat_ratio"
+  "additives_per_energy"
 ]

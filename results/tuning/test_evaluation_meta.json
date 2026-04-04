@@ -2,23 +2,23 @@
   "model": "XGBoost (Tuned)",
   "split": "test",
   "n_trials": 30,
-  "baseline_macro_f1": 0.8599,
-  "tuned_val_macro_f1": 0.8589,
+  "baseline_macro_f1": 0.8605,
+  "tuned_val_macro_f1": 0.8649,
   "test_metrics": {
-    "Accuracy": 0.8748,
-    "Balanced Accuracy": 0.888,
-    "Macro Precision": 0.8324,
-    "Macro Recall": 0.888,
-    "Macro F1": 0.8578,
-    "Weighted Precision": 0.8833,
-    "Weighted Recall": 0.8748,
-    "Weighted F1": 0.8772,
-    "Log Loss": 0.3253,
-    "ROC-AUC (OVR)": 0.9738,
-    "Inference Time (s)": 0.7324
+    "Accuracy": 0.8788,
+    "Balanced Accuracy": 0.8939,
+    "Macro Precision": 0.8469,
+    "Macro Recall": 0.8939,
+    "Macro F1": 0.8682,
+    "Weighted Precision": 0.8877,
+    "Weighted Recall": 0.8788,
+    "Weighted F1": 0.8813,
+    "Log Loss": 0.3163,
+    "ROC-AUC (OVR)": 0.976,
+    "Inference Time (s)": 1.2675
   },
   "features": {
-    "total_count": 15,
+    "total_count": 13,
     "original_features": [
       "energy_100g",
       "fat_100g",
@@ -29,14 +29,12 @@
       "salt_100g",
       "saturated_fat_100g",
       "additives_n",
-      "added_sugars_100g",
-      "nutriscore_score"
+      "added_sugars_100g"
     ],
     "engineered_features": [
       "sugar_fiber_ratio",
       "fat_protein_ratio",
-      "additives_per_energy",
-      "saturated_fat_ratio"
+      "additives_per_energy"
     ],
     "removed_features": [
       "sodium_100g",
@@ -56,11 +54,9 @@
       "saturated_fat_100g",
       "additives_n",
       "added_sugars_100g",
-      "nutriscore_score",
       "sugar_fiber_ratio",
       "fat_protein_ratio",
-      "additives_per_energy",
-      "saturated_fat_ratio"
+      "additives_per_energy"
     ]
   }
 }
