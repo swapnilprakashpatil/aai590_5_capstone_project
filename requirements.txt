@@ -19,3 +19,14 @@ python-multipart>=0.0.9
 joblib>=1.3.0
 easyocr>=1.7.0
 Pillow>=10.0.0
+openai>=1.10.0
+pydantic>=2.0.0
+
+# LangChain for agent orchestration and memory
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.20
+
+# Additional dependencies for enhanced features
+markdown>=3.5.0
+nest-asyncio>=1.6.0

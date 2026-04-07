@@ -64,8 +64,8 @@ Write-Host ""
 # Launch backend as a background job
 $backendJob = Start-Job -Name "NutriVision-Backend" -ScriptBlock {
     param($root, $python)
-    Set-Location $root
-    & $python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    Set-Location (Join-Path $root "backend")
+    & $python main.py
 } -ArgumentList $ROOT, $PYTHON
 
 # Launch frontend as a background job
