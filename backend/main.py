@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 import logging
 import traceback
+import asyncio
+from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv(Path(__file__).parent / '.env')
 
 # Configure logging
 logging.basicConfig(
@@ -16,7 +23,7 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -27,8 +34,10 @@ import numpy as np
 import pandas as pd
 from PIL import Image, ImageEnhance
 from xgboost import XGBClassifier
+from pydantic import BaseModel
 
 from src.anomaly.inference import predict_nova_and_anomaly
+from backend.agents import HealthInsightsOrchestrator
 
 app = FastAPI(title="NutriVision AI", version="1.0.0")
 
@@ -67,6 +76,15 @@ SCALER = joblib.load(BACKEND_MODELS_DIR / "final_scaler.joblib")
 NOVA_CLASSIFIER = XGBClassifier()
 NOVA_CLASSIFIER.load_model(BACKEND_MODELS_DIR / "xgb_tuned.json")
 
+# Initialize Health Insights Orchestrator (lazy-loaded)
+_health_orchestrator = None
+
+def _get_health_orchestrator() -> HealthInsightsOrchestrator:
+    global _health_orchestrator
+    if _health_orchestrator is None:
+        _health_orchestrator = HealthInsightsOrchestrator()
+    return _health_orchestrator
+
 # NutriScore grade thresholds (food category A-E mapping)
 _GRADE_THRESHOLDS = [(-10, "A"), (2, "B"), (10, "C"), (18, "D"), (40, "E")]
 
@@ -89,6 +107,71 @@ _EPS = 1e-5
 
 # OCR: lazy-loaded EasyOCR reader
 _ocr_reader = None
+_ocr_cache: dict[str, dict] = {}  # Cache OCR results by image hash
+
+# Pre-defined nutrition data for sample images (for instant demo responses)
+SAMPLE_NUTRITION_DATA = {
+    "1.webp": {  # Doritos Nacho Cheese
+        "energy_100g": "2100", "fat_100g": "28.6", "saturated_fat_100g": "4.3",
+        "carbohydrates_100g": "60.7", "sugars_100g": "3.6", "fiber_100g": "3.6",
+        "proteins_100g": "7.1", "salt_100g": "1.4", "additives_n": "5"
+    },
+    "2.webp": {  # Coca Cola
+        "energy_100g": "180", "fat_100g": "0", "saturated_fat_100g": "0",
+        "carbohydrates_100g": "10.6", "sugars_100g": "10.6", "fiber_100g": "0",
+        "proteins_100g": "0", "salt_100g": "0.01", "additives_n": "3"
+    },
+    "3.webp": {  # Perdue Chicken Breast
+        "energy_100g": "465", "fat_100g": "1.8", "saturated_fat_100g": "0.5",
+        "carbohydrates_100g": "0", "sugars_100g": "0", "fiber_100g": "0",
+        "proteins_100g": "22.3", "salt_100g": "0.3", "additives_n": "0"
+    },
+    "4.webp": {  # Maruchan Ramen
+        "energy_100g": "1560", "fat_100g": "16.0", "saturated_fat_100g": "8.0",
+        "carbohydrates_100g": "52.0", "sugars_100g": "4.0", "fiber_100g": "2.0",
+        "proteins_100g": "8.0", "salt_100g": "4.5", "additives_n": "8"
+    },
+    "5.webp": {  # Barley
+        "energy_100g": "1475", "fat_100g": "2.3", "saturated_fat_100g": "0.5",
+        "carbohydrates_100g": "73.5", "sugars_100g": "0.8", "fiber_100g": "17.3",
+        "proteins_100g": "12.5", "salt_100g": "0.01", "additives_n": "0"
+    },
+    "6.webp": {  # Fischers Honey
+        "energy_100g": "1340", "fat_100g": "0", "saturated_fat_100g": "0",
+        "carbohydrates_100g": "82.0", "sugars_100g": "82.0", "fiber_100g": "0.2",
+        "proteins_100g": "0.3", "salt_100g": "0.01", "additives_n": "0"
+    },
+    "7.webp": {  # Great Value Whole Milk
+        "energy_100g": "260", "fat_100g": "3.3", "saturated_fat_100g": "2.1",
+        "carbohydrates_100g": "5.0", "sugars_100g": "5.0", "fiber_100g": "0",
+        "proteins_100g": "3.4", "salt_100g": "0.05", "additives_n": "1"
+    },
+    "8.webp": {  # Heinz Ketchup
+        "energy_100g": "420", "fat_100g": "0.1", "saturated_fat_100g": "0",
+        "carbohydrates_100g": "24.2", "sugars_100g": "22.8", "fiber_100g": "0.3",
+        "proteins_100g": "1.0", "salt_100g": "1.1", "additives_n": "2"
+    },
+    "9.webp": {  # Lakewood Orange Juice
+        "energy_100g": "188", "fat_100g": "0", "saturated_fat_100g": "0",
+        "carbohydrates_100g": "10.4", "sugars_100g": "8.3", "fiber_100g": "0.2",
+        "proteins_100g": "0.7", "salt_100g": "0.01", "additives_n": "0"
+    },
+    "10.webp": {  # Turkey Hill Ice Cream
+        "energy_100g": "920", "fat_100g": "10.7", "saturated_fat_100g": "6.7",
+        "carbohydrates_100g": "23.3", "sugars_100g": "20.0", "fiber_100g": "0.7",
+        "proteins_100g": "3.3", "salt_100g": "0.1", "additives_n": "6"
+    },
+    "11.webp": {  # Velveeta Cheese Slices
+        "energy_100g": "1255", "fat_100g": "21.4", "saturated_fat_100g": "14.3",
+        "carbohydrates_100g": "14.3", "sugars_100g": "14.3", "fiber_100g": "0",
+        "proteins_100g": "14.3", "salt_100g": "3.2", "additives_n": "7"
+    },
+    "12.webp": {  # Great Value Sweet Peas
+        "energy_100g": "315", "fat_100g": "0.4", "saturated_fat_100g": "0.1",
+        "carbohydrates_100g": "11.8", "sugars_100g": "3.9", "fiber_100g": "4.3",
+        "proteins_100g": "5.1", "salt_100g": "0.24", "additives_n": "0"
+    },
+}
 
 def _get_ocr_reader():
     global _ocr_reader
@@ -97,11 +180,19 @@ def _get_ocr_reader():
         _ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
     return _ocr_reader
 
+def _get_image_hash(img: Image.Image) -> str:
+    """Generate a simple hash of the image for caching."""
+    import hashlib
+    img_bytes = io.BytesIO()
+    img.save(img_bytes, format='PNG')
+    return hashlib.md5(img_bytes.getvalue()).hexdigest()
+
 
 def _preprocess_variants(img: Image.Image) -> list[np.ndarray]:
     """
-    Return several preprocessed versions of the image.
+    Return preprocessed versions of the image.
     EasyOCR is run on each; results are merged.
+    Optimized to use fewer variants for speed.
     """
     # Upscale small images — OCR needs at least ~800 px on the short side
     w, h = img.size
@@ -112,23 +203,17 @@ def _preprocess_variants(img: Image.Image) -> list[np.ndarray]:
 
     variants: list[np.ndarray] = []
 
-    # 1. Original colour (EasyOCR handles colour natively)
+    # 1. Original colour (EasyOCR handles colour natively) - works well for most labels
     variants.append(np.array(img.convert("RGB")))
 
-    # 2. High-contrast grayscale
+    # 2. High-contrast grayscale - helps with faded or low-contrast labels
     gray = img.convert("L")
     g_enh = ImageEnhance.Contrast(gray).enhance(2.5)
     g_enh = ImageEnhance.Sharpness(g_enh).enhance(2.0)
     variants.append(np.array(g_enh))
 
-    # 3. Hard-binarised (good for dark text on white labels)
-    # Use simple PIL threshold at 150 — good enough without cv2
-    binary = gray.point(lambda p: 255 if p > 150 else 0)
-    variants.append(np.array(binary.convert("RGB")))
-
-    # 4. Inverted binarised (good for white text on dark labels)
-    inv_binary = gray.point(lambda p: 0 if p > 150 else 255)
-    variants.append(np.array(inv_binary.convert("RGB")))
+    # Reduced from 4 to 2 variants for faster processing
+    # Binary variants are only needed for very poor quality images
 
     return variants
 
@@ -410,12 +495,12 @@ def _parse_lines(lines: list[str]) -> tuple[dict[str, float], dict[str, bool]]:
 
 def _build_feature_vector(fields: dict) -> np.ndarray:
     """
-    Compute all 15 model features from the raw nutrition values submitted by the user.
+    Compute all 13 model features from the raw nutrition values submitted by the user.
     Derived ratios use the same epsilon-safe formulas as Notebook 02.
     
-    Features match the training data:
-    - 11 raw nutritional values
-    - 4 derived ratios
+    Features match the training data (feature_names.json):
+    - 10 raw nutritional values (excluding nutriscore_score)
+    - 3 derived ratios (excluding saturated_fat_ratio)
     """
     energy     = fields["energy_100g"]
     fat        = fields["fat_100g"]
@@ -427,19 +512,19 @@ def _build_feature_vector(fields: dict) -> np.ndarray:
     sat_fat    = fields["saturated_fat_100g"]
     additives  = fields["additives_n"]
     add_sugars = fields["added_sugars_100g"]
-    nutriscore = fields["nutriscore_score"]
+    # nutriscore is NOT part of the model features (excluded)
 
-    # Derived features (4 ratios)
+    # Derived features (3 ratios)
     sugar_fiber_ratio    = sugars / (fiber + _EPS)
     fat_protein_ratio    = fat / (proteins + _EPS)
     additives_per_energy = additives / (energy + 1)
-    saturated_fat_ratio  = sat_fat / (fat + _EPS)
+    # saturated_fat_ratio is NOT part of the model features (excluded)
 
-    # Feature order must match the training data exactly
+    # Feature order must match feature_names.json exactly (13 features)
     row = [
         energy, fat, carbs, sugars, fiber, proteins, salt, sat_fat,
-        additives, add_sugars, nutriscore,
-        sugar_fiber_ratio, fat_protein_ratio, additives_per_energy, saturated_fat_ratio,
+        additives, add_sugars,
+        sugar_fiber_ratio, fat_protein_ratio, additives_per_energy,
     ]
     return np.array(row, dtype=float).reshape(1, -1)
 
@@ -449,28 +534,101 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/health/ai")
+async def health_ai():
+    """
+    Check Azure OpenAI model health with a minimal test request
+    """
+    try:
+        orchestrator = _get_health_orchestrator()
+        
+        # Test with more tokens to see if model returns content
+        test_response = await orchestrator.client.chat.completions.create(
+            model=orchestrator.deployment,
+            messages=[
+                {"role": "user", "content": "Reply with OK"}
+            ],
+            max_completion_tokens=100
+        )
+        
+        response_text = test_response.choices[0].message.content
+        logger.info(f"AI health check - Raw response: '{response_text}'")
+        logger.info(f"AI health check - Finish reason: {test_response.choices[0].finish_reason}")
+        logger.info(f"AI health check - Tokens: prompt={test_response.usage.prompt_tokens}, completion={test_response.usage.completion_tokens}")
+        
+        if response_text:
+            response_text = response_text.strip()
+        else:
+            response_text = ""
+        
+        return {
+            "status": "ok",
+            "model": orchestrator.deployment,
+            "response": response_text,
+            "tokens_used": test_response.usage.total_tokens,
+            "finish_reason": test_response.choices[0].finish_reason,
+            "prompt_tokens": test_response.usage.prompt_tokens,
+            "completion_tokens": test_response.usage.completion_tokens
+        }
+    except Exception as e:
+        logger.error(f"AI health check failed: {e}")
+        logger.error(traceback.format_exc())
+        return {
+            "status": "error",
+            "error": str(e),
+            "model": os.getenv("AZURE_OPENAI_ROUTER_DEPLOYMENT_NAME", "unknown")
+        }
+
+
 @app.post("/extract")
 async def extract_nutrition(file: UploadFile = File(...)):
     """
     OCR a food-label image and return auto-detected nutrition values.
     The frontend uses this to pre-fill the review form.
+    For demo sample images, returns pre-defined data instantly.
+    For custom uploads, uses OCR with caching.
     """
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
+    # Check if this is a sample image (instant response for demo)
+    if file.filename and file.filename in SAMPLE_NUTRITION_DATA:
+        logger.info(f"Sample image detected: {file.filename} - returning pre-defined data")
+        sample_data = SAMPLE_NUTRITION_DATA[file.filename]
+        auto_flags = {k: True for k in sample_data.keys()}
+        return {
+            "extracted": sample_data,
+            "auto_fields": auto_flags,
+            "raw_text": [f"Sample nutrition data for {file.filename}"],
+            "fields_found": len(sample_data),
+        }
+
     content = await file.read()
     img = Image.open(io.BytesIO(content))
+    
+    # Check cache for custom uploads
+    img_hash = _get_image_hash(img)
+    if img_hash in _ocr_cache:
+        logger.info(f"OCR cache hit for image hash {img_hash[:8]}")
+        return _ocr_cache[img_hash]
 
+    logger.info(f"OCR processing custom image - hash {img_hash[:8]}")
     detections = _ocr_image(img)
     lines = _reconstruct_lines(detections)
     values, auto_flags = _parse_lines(lines)
 
-    return {
+    result = {
         "extracted":    values,
         "auto_fields":  auto_flags,
         "raw_text":     lines,          # reconstructed lines (for debugging)
         "fields_found": len(values),
     }
+    
+    # Cache the result
+    _ocr_cache[img_hash] = result
+    logger.info(f"OCR cache stored for image hash {img_hash[:8]}")
+    
+    return result
 
 
 @app.post("/analyze")
@@ -572,6 +730,243 @@ async def analyze_food(
         logger.error(f"Error in analyze_food: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+# Pydantic models for request/response
+class UserProfile(BaseModel):
+    age: int = 30
+    weight: float = 70.0
+    height: float = 170.0
+    activity_level: str = "moderate"
+    health_conditions: list[str] = []
+    dietary_restrictions: list[str] = []
+    allergies: list[str] = []
+    goals: list[str] = []
+    family_history: list[str] = []
+
+
+class HealthInsightsRequest(BaseModel):
+    product_data: Dict[str, Any]
+    user_profile: UserProfile
+    use_mock_data: bool = False
+
+
+@app.post("/health-insights")
+async def generate_health_insights(request: HealthInsightsRequest = Body(...)):
+    """
+    Generate comprehensive health insights using multi-agent RAG framework.
+    
+    Args:
+        request: Contains product_data (nutrition, NOVA, anomalies) and user_profile
+    
+    Returns:
+        Insights from all health agents plus technical analysis
+    """
+    try:
+        logger.info("Generating health insights...")
+        
+        orchestrator = _get_health_orchestrator()
+        
+        # Generate insights using the agentic RAG framework
+        insights = await orchestrator.generate_insights(
+            product_data=request.product_data,
+            user_profile=request.user_profile.dict()
+        )
+        
+        logger.info(f"Health insights generated in {insights['metadata']['total_duration_seconds']:.2f}s")
+        
+        return insights
+    
+    except Exception as e:
+        logger.error(f"Error generating health insights: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
+
+
+@app.post("/analyze-with-insights")
+async def analyze_with_health_insights(
+    file: UploadFile = File(...),
+    user_profile: str = Form(...),  # JSON string of UserProfile
+    # Core nutrition facts (per 100 g / 100 ml)
+    energy_100g:              float = Form(...),
+    fat_100g:                 float = Form(...),
+    carbohydrates_100g:       float = Form(...),
+    sugars_100g:              float = Form(...),
+    fiber_100g:               float = Form(...),
+    proteins_100g:            float = Form(...),
+    salt_100g:                float = Form(...),
+    saturated_fat_100g:       float = Form(...),
+    additives_n:              float = Form(...),
+    trans_fat_100g:           float = Form(0.0),
+    added_sugars_100g:        float = Form(0.0),
+    monounsaturated_fat_100g: float = Form(0.0),
+    polyunsaturated_fat_100g: float = Form(0.0),
+    starch_100g:              float = Form(0.0),
+    nutriscore_score:         float = Form(0.0),
+):
+    """
+    Complete pipeline: Analyze nutrition + NOVA + anomalies + Generate health insights
+    
+    This is a convenience endpoint that combines /analyze and /health-insights
+    """
+    try:
+        import json
+        user_profile_dict = json.loads(user_profile)
+        
+        # First, run the analysis
+        fields = {
+            "energy_100g":              energy_100g,
+            "fat_100g":                 fat_100g,
+            "carbohydrates_100g":       carbohydrates_100g,
+            "sugars_100g":              sugars_100g,
+            "fiber_100g":               fiber_100g,
+            "proteins_100g":            proteins_100g,
+            "salt_100g":                salt_100g,
+            "saturated_fat_100g":       saturated_fat_100g,
+            "additives_n":              additives_n,
+            "trans_fat_100g":           trans_fat_100g,
+            "added_sugars_100g":        added_sugars_100g,
+            "monounsaturated_fat_100g": monounsaturated_fat_100g,
+            "polyunsaturated_fat_100g": polyunsaturated_fat_100g,
+            "starch_100g":              starch_100g,
+            "nutriscore_score":         nutriscore_score,
+        }
+
+        X_raw = _build_feature_vector(fields)
+        results = predict_nova_and_anomaly(
+            X_raw           = X_raw,
+            scaler          = SCALER,
+            nova_classifier = NOVA_CLASSIFIER,
+            autoencoder     = AUTOENCODER,
+            ae_threshold    = AE_THRESHOLD,
+            iso_forest      = ISO_FOREST,
+            oc_svm          = OC_SVM,
+        )
+
+        row = results.iloc[0]
+        nova_group = int(row["nova_pred"])
+        
+        analysis_result = {
+            "nova_group":       nova_group,
+            "nova_description": NOVA_DESCRIPTIONS[nova_group],
+            "nova_color":       NOVA_COLORS[nova_group],
+            "nova_confidence":  round(float(row["nova_confidence"]) * 100, 1),
+            "nutriscore_grade": _nutriscore_grade(nutriscore_score),
+            "anomaly": {
+                "is_anomalous":   bool(row["is_anomalous"]),
+                "votes":          int(row["anomaly_votes"]),
+                "ensemble_score": round(float(row["ensemble_score"]) * 100, 1),
+                "ae_score":       round(float(row["ae_score"]), 6),
+                "if_score":       round(float(row["if_score"]), 6),
+                "svm_score":      round(float(row["svm_score"]), 6),
+            },
+            "nutrition_per_100g": {
+                "energy_kcal":   round(energy_100g / 4.184, 1),
+                "energy_kj":     energy_100g,
+                "fat":           fat_100g,
+                "saturated_fat": saturated_fat_100g,
+                "carbohydrates": carbohydrates_100g,
+                "sugars":        sugars_100g,
+                "fiber":         fiber_100g,
+                "proteins":      proteins_100g,
+                "salt":          salt_100g,
+                "additives":     int(additives_n),
+            },
+        }
+        
+        # Generate health insights
+        orchestrator = _get_health_orchestrator()
+        
+        product_data = {
+            "product_name": file.filename,
+            "nova_class": nova_group,
+            "nutrition": analysis_result["nutrition_per_100g"],
+            "anomalies": analysis_result["anomaly"]
+        }
+        
+        insights = await orchestrator.generate_insights(
+            product_data=product_data,
+            user_profile=user_profile_dict
+        )
+        
+        return {
+            "analysis": analysis_result,
+            "health_insights": insights
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in analyze_with_health_insights: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@app.post("/test/mock-insights")
+async def test_mock_insights(user_profile: Optional[UserProfile] = None):
+    """
+    Test endpoint with mocked product data to test the agentic AI framework.
+    
+    This generates insights for a sample ultra-processed snack product.
+    """
+    try:
+        # Mock product data - ultra-processed snack (NOVA 4)
+        mock_product = {
+            "product_name": "Sample Cheese Flavored Snack",
+            "nova_class": 4,
+            "nutrition": {
+                "energy_kcal": 536,
+                "energy_kj": 2245,
+                "fat": 33.0,
+                "saturated_fat": 10.0,
+                "carbohydrates": 53.0,
+                "sugars": 2.5,
+                "fiber": 1.5,
+                "proteins": 6.5,
+                "salt": 1.8,
+                "additives": 8,
+            },
+            "anomalies": {
+                "is_anomalous": True,
+                "votes": 2,
+                "ensemble_score": 66.7,
+                "ae_score": 0.1523,
+                "if_score": -0.0872,
+                "svm_score": 0.3456,
+            }
+        }
+        
+        # Default user profile if not provided
+        if user_profile is None:
+            user_profile = UserProfile(
+                age=35,
+                weight=75.0,
+                height=175.0,
+                activity_level="moderate",
+                health_conditions=["high blood pressure", "pre-diabetes"],
+                dietary_restrictions=["trying to reduce sodium", "low sugar diet"],
+                allergies=["peanuts"],
+                goals=["weight loss", "heart health", "better energy"],
+                family_history=["type 2 diabetes", "heart disease"]
+            )
+        
+        logger.info("Generating mock health insights for testing...")
+        
+        orchestrator = _get_health_orchestrator()
+        insights = await orchestrator.generate_insights(
+            product_data=mock_product,
+            user_profile=user_profile.dict()
+        )
+        
+        return {
+            "mock_product": mock_product,
+            "user_profile": user_profile.dict(),
+            "health_insights": insights,
+            "note": "This is test data with mocked product information"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in test_mock_insights: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Mock insights failed: {str(e)}")
 
 
 if __name__ == "__main__":

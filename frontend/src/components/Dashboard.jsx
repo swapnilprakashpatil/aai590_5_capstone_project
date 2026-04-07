@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { InsightRenderer } from './InsightRenderer'
 import {
   Upload,
   Camera,
@@ -17,8 +18,12 @@ import {
   ZoomIn,
   X,
   Search,
+  User,
+  Heart,
+  Activity,
+  Plus,
 } from 'lucide-react'
-import { analyzeLabel, extractNutrition } from '../api'
+import { analyzeLabel, extractNutrition, checkApiHealth, checkAIHealth, analyzeWithInsights, generateHealthInsights } from '../api'
 
 // Nutrition field definitions
 const CORE_FIELDS = [
@@ -346,8 +351,24 @@ function ScoreMeter({ label, value, maxValue, color }) {
   )
 }
 
-function ResultsPanel({ result, imagePreview, onReset }) {
-  const { nova_group, nova_description, nova_confidence, nutriscore_grade, anomaly, nutrition_per_100g } = result
+function ResultsPanel({ result, imagePreview, productName, onReset }) {
+  // Handle both old format (flat) and new format (with analysis wrapper)
+  const analysis = result.analysis || result
+  const healthInsights = result.health_insights
+  
+  const { nova_group, nova_description, nova_confidence, nutriscore_grade, anomaly, nutrition_per_100g } = analysis
+  
+  const [activeInsightTab, setActiveInsightTab] = useState('nutritional_information')
+
+  // Health insight tabs configuration
+  const insightTabs = [
+    { id: 'nutritional_information', label: 'Nutrition Analysis', icon: '🔬' },
+    { id: 'health_risks', label: 'Health Risks', icon: '⚠️' },
+    { id: 'dietary_recommendations', label: 'Recommendations', icon: '🥗' },
+    { id: 'alternative_products', label: 'Alternatives', icon: '🔄' },
+    { id: 'long_term_health', label: 'Long-term Impact', icon: '📈' },
+    { id: 'technical_agentic_analysis', label: 'Technical Analysis', icon: '🤖' },
+  ]
 
   return (
     <motion.div
@@ -358,6 +379,12 @@ function ResultsPanel({ result, imagePreview, onReset }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
+          {productName && (
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+              <h3 className="text-lg font-bold text-primary-600 dark:text-primary-400">{productName}</h3>
+            </div>
+          )}
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Analysis Results</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">AI-powered nutritional assessment complete</p>
         </div>
@@ -488,11 +515,111 @@ function ResultsPanel({ result, imagePreview, onReset }) {
           ))}
         </div>
       </div>
+
+      {/* Health Insights Section */}
+      {(healthInsights !== undefined) && (
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Heart className="w-6 h-6 text-red-500" />
+            <h4 className="font-bold text-gray-800 dark:text-gray-100 text-xl">
+              Personalized Health Insights
+            </h4>
+          </div>
+          
+          {healthInsights === null ? (
+            // Loading state
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader className="w-12 h-12 animate-spin text-primary-600" />
+              <p className="text-gray-600 dark:text-gray-400 text-center">
+                Generating AI-powered health insights...<br />
+                <span className="text-sm">6 specialized agents are analyzing your food. This takes 30-40 seconds.</span>
+              </p>
+            </div>
+          ) : healthInsights.error ? (
+            // Error state
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+              <p className="text-red-700 dark:text-red-400">
+                Failed to generate health insights: {healthInsights.error}
+              </p>
+            </div>
+          ) : (
+            // Success state
+            <>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                AI-powered analysis tailored to your health profile • Generated in {healthInsights.metadata?.total_duration_seconds?.toFixed(1)}s by {healthInsights.metadata?.agent_count} specialized agents
+              </p>
+
+              {/* Insight Tabs */}
+              <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 pb-2">
+                {insightTabs.map(tab => {
+                  const insight = healthInsights.insights?.[tab.id]
+                  if (!insight || insight.error) return null
+                  
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveInsightTab(tab.id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        activeInsightTab === tab.id
+                          ? 'bg-primary-600 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Active Insight Content */}
+              {healthInsights.insights?.[activeInsightTab] && !healthInsights.insights[activeInsightTab].error && (
+            <motion.div
+              key={activeInsightTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700"
+            >
+              <InsightRenderer 
+                data={healthInsights.insights[activeInsightTab].data}
+                content={healthInsights.insights[activeInsightTab].content}
+                agentType={activeInsightTab}
+              />
+              
+              {/* Metadata */}
+              {healthInsights.insights[activeInsightTab].metadata && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                  <span>⚡ Generated in {healthInsights.insights[activeInsightTab].metadata.duration_seconds?.toFixed(2)}s</span>
+                  <span>🔤 {healthInsights.insights[activeInsightTab].metadata.prompt_tokens + healthInsights.insights[activeInsightTab].metadata.completion_tokens} tokens</span>
+                  <span>🤖 {healthInsights.insights[activeInsightTab].metadata.model}</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+            </>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }
 
 // Main Dashboard
+
+// Default demo profile (matches Profile.jsx)
+const DEFAULT_DEMO_PROFILE = {
+  name: 'Alex Morgan',
+  age: '35',
+  height: '69', // inches (175 cm)
+  weight: '165', // lbs (75 kg)
+  gender: 'male',
+  activityLevel: 'moderate',
+  medicalConditions: ['Hypertension', 'Type 2 Diabetes'],
+  allergies: ['Peanuts', 'Shellfish'],
+  dietaryPreferences: ['Low Sodium', 'High Fiber'],
+  healthGoals: 'Manage blood sugar levels and reduce sodium intake for better cardiovascular health',
+}
 
 const Dashboard = () => {
   // steps: 'upload' | 'extracting' | 'form' | 'analyzing' | 'results'
@@ -507,13 +634,115 @@ const Dashboard = () => {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [ocrError, setOcrError] = useState(false)
+  const [analysisError, setAnalysisError] = useState(false)
+  const [selectedProductName, setSelectedProductName] = useState('')
+  const [showingLabel, setShowingLabel] = useState(false)
+  const [reviewTab, setReviewTab] = useState('nutrition') // 'nutrition' or 'profile'
+  const [userProfile, setUserProfile] = useState(null)
+  const [apiStatus, setApiStatus] = useState('checking') // 'online' | 'offline' | 'checking'
+  const [aiStatus, setAiStatus] = useState('checking') // 'online' | 'offline' | 'checking'
+  const [aiModel, setAiModel] = useState('AI Model')
+  const [showHealthInsights, setShowHealthInsights] = useState(true) // Toggle for health insights
   const fileInputRef = useRef(null)
 
-  // Sample images from /public/labels folder
-  const SAMPLE_IMAGES = Array.from({ length: 10 }, (_, i) => ({
+  // Load user profile from localStorage
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('userProfile')
+    if (savedProfile) {
+      try {
+        setUserProfile(JSON.parse(savedProfile))
+      } catch (e) {
+        console.error('Failed to load profile:', e)
+        setUserProfile(DEFAULT_DEMO_PROFILE)
+      }
+    } else {
+      // Use demo profile if none saved
+      setUserProfile(DEFAULT_DEMO_PROFILE)
+    }
+  }, [])
+
+  // Reload profile when navigating to form step (in case it was updated)
+  useEffect(() => {
+    if (step === 'form') {
+      const savedProfile = localStorage.getItem('userProfile')
+      if (savedProfile) {
+        try {
+          setUserProfile(JSON.parse(savedProfile))
+        } catch (e) {
+          console.error('Failed to reload profile:', e)
+          setUserProfile(DEFAULT_DEMO_PROFILE)
+        }
+      } else {
+        // Use demo profile if none saved
+        setUserProfile(DEFAULT_DEMO_PROFILE)
+      }
+    }
+  }, [step])
+
+  // Check API health status
+  useEffect(() => {
+    const checkStatus = async () => {
+      const isOnline = await checkApiHealth()
+      setApiStatus(isOnline ? 'online' : 'offline')
+    }
+    
+    checkStatus() // Initial check
+    const interval = setInterval(checkStatus, 30000) // Check every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
+
+  // Check AI model health status
+  useEffect(() => {
+    const checkAIStatus = async () => {
+      const result = await checkAIHealth()
+      if (result.status === 'ok') {
+        setAiStatus('online')
+        setAiModel(result.model || 'AI Model')
+      } else {
+        setAiStatus('offline')
+      }
+    }
+    
+    checkAIStatus() // Initial check
+    const interval = setInterval(checkAIStatus, 60000) // Check every 60 seconds (less frequent due to cost)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Sample product data with image pairs
+  const PRODUCT_FILENAMES = [
+    '1-Doritos-Nacho-Cheese-Tortilla-Snack-Chips-Party-Size-14-5-Ounce-Bag.avif',
+    '2-Coca Cola.webp',
+    '3-Perdue-No-Antibiotics-Ever-Fresh-Chicken-Breast-Tenderloins-1-2-lb-Tray.avif',
+    '4-Maruchan-Ramen-Noodle-Creamy-Chicken-Flavor-Soup-3-oz-Shelf-Stable-Package.avif',
+    '5-Barley.webp',
+    '6-Fischers-Honey-24oz-Raw-and-Unfiltered-Local-100-US-Grade-A-Squeeze-Bottle.avif',
+    '7-Great-Value-Whole-Vitamin-D-Milk-Gallon-Plastic.avif',
+    '8-Heinz-Tomato-Ketchup-20-oz-Bottle.avif',
+    '9-Lakewood-Organic-Pure-Orange-Juice-32-fl-oz-Pack-of-2.avif',
+    '10-Turkey-Hill-Moose-Tracks-Premium-Ice-Cream-46-fl-oz.avif',
+    '11-Velveeta-Slices-Original-Cheese-24-Ct-Pk.avif',
+    '12-Great-Value-Frozen-Sweet-Peas-12-oz-Steamable-Bag.avif',
+  ]
+
+  const SAMPLE_IMAGES = Array.from({ length: 12 }, (_, i) => ({
     id: i + 1,
-    url: `${import.meta.env.BASE_URL}labels/${i + 1}.webp`,
-    name: `Sample ${i + 1}`,
+    labelUrl: `${import.meta.env.BASE_URL}labels/label/${i + 1}.webp`,
+    productUrl: `${import.meta.env.BASE_URL}labels/product/${PRODUCT_FILENAMES[i]}`,
+    name: [
+      'Doritos Nacho Cheese',
+      'Coca Cola', 
+      'Perdue Chicken Breast',
+      'Maruchan Ramen',
+      'Barley',
+      'Fischers Honey',
+      'Great Value Whole Milk',
+      'Heinz Ketchup',
+      'Lakewood Orange Juice',
+      'Turkey Hill Ice Cream',
+      'Velveeta Cheese Slices',
+      'Great Value Sweet Peas'
+    ][i],
   }))
 
   const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true) }
@@ -535,6 +764,9 @@ const Dashboard = () => {
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
     setError(null)
+    setOcrError(false)
+    setSelectedProductName('') // Clear product name for uploaded images
+    setShowingLabel(true) // Show label directly for uploaded images (no product image pair)
     setStep('extracting')
 
     try {
@@ -552,30 +784,41 @@ const Dashboard = () => {
       // Expand advanced section if OCR found any advanced fields
       const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
       if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
-    } catch (_err) {
-      // OCR failed — still open form, user enters manually
+      setStep('form')
+    } catch (err) {
+      // OCR failed — show error with retry option
+      setOcrError(true)
+      setError(`OCR extraction failed: ${err.message || 'Network error'}. You can retry or enter values manually.`)
       setAutoFields({})
       setOcrFieldCount(0)
+      setStep('form')
     }
-
-    setStep('form')
   }
 
-  const handleSampleImageSelect = async (sampleUrl) => {
+  const handleSampleImageSelect = async (sample) => {
     setError(null)
+    setOcrError(false)
+    setSelectedProductName(sample.name)
+    setShowingLabel(false)
     setStep('extracting')
 
+    // Start with product image, then flip to label after 1.5 seconds
+    // (OCR is instant for sample images, so shorter delay)
+    setTimeout(() => {
+      setShowingLabel(true)
+    }, 1500)
+
     try {
-      // Fetch the sample image and convert to File object
-      const response = await fetch(sampleUrl)
+      // Fetch the label image (for OCR) and convert to File object
+      const response = await fetch(sample.labelUrl)
       const blob = await response.blob()
-      const filename = sampleUrl.split('/').pop()
+      const filename = sample.labelUrl.split('/').pop()
       const file = new File([blob], filename, { type: blob.type })
       
       setImageFile(file)
-      setImagePreview(sampleUrl)
+      setImagePreview(sample.labelUrl)
 
-      // Run OCR on the sample image
+      // Run OCR on the label image
       const ocr = await extractNutrition(file)
       const prefilled = { ...DEFAULT_VALUES }
       if (ocr.extracted) {
@@ -589,12 +832,45 @@ const Dashboard = () => {
       
       const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
       if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
-    } catch (_err) {
+      setStep('form')
+    } catch (err) {
+      setOcrError(true)
+      setError(`OCR extraction failed: ${err.message || 'Network error'}. You can retry or enter values manually.`)
       setAutoFields({})
       setOcrFieldCount(0)
+      setStep('form')
     }
+  }
 
-    setStep('form')
+  const handleRetryOcr = async () => {
+    if (!imageFile) return
+    
+    setError(null)
+    setOcrError(false)
+    setStep('extracting')
+
+    try {
+      const ocr = await extractNutrition(imageFile)
+      const prefilled = { ...DEFAULT_VALUES }
+      if (ocr.extracted) {
+        Object.entries(ocr.extracted).forEach(([k, v]) => {
+          prefilled[k] = String(v)
+        })
+      }
+      setNutrition(prefilled)
+      setAutoFields(ocr.auto_fields || {})
+      setOcrFieldCount(ocr.fields_found || 0)
+      
+      const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
+      if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
+      setStep('form')
+    } catch (err) {
+      setOcrError(true)
+      setError(`OCR extraction failed again: ${err.message || 'Network error'}. Please enter values manually.`)
+      setAutoFields({})
+      setOcrFieldCount(0)
+      setStep('form')
+    }
   }
 
   const handleFieldChange = (key, value) => {
@@ -613,6 +889,7 @@ const Dashboard = () => {
 
     setStep('analyzing')
     setError(null)
+    setAnalysisError(false)
 
     // Convert all nutrition values to numbers, defaulting blanks to 0
     const numericNutrition = Object.fromEntries(
@@ -620,11 +897,97 @@ const Dashboard = () => {
     )
 
     try {
-      const data = await analyzeLabel(imageFile, numericNutrition)
-      setResult(data)
+      // Step 1: Get NOVA classification and anomaly detection (fast)
+      const analysisData = await analyzeLabel(imageFile, numericNutrition)
+      
+      // Show NOVA results immediately
+      // Set health_insights to null (loading) if enabled, undefined if disabled
+      setResult({ 
+        analysis: analysisData, 
+        health_insights: showHealthInsights ? null : undefined 
+      })
       setStep('results')
+      
+      // Step 2: Generate AI health insights (slow, 30-40s) - only if checkbox is checked
+      if (showHealthInsights) {
+        try {
+          const insights = await generateHealthInsights(
+            analysisData,
+            userProfile || DEFAULT_DEMO_PROFILE,
+            selectedProductName || imageFile.name
+          )
+          
+          // Merge health insights into results
+          setResult(prev => ({ ...prev, health_insights: insights }))
+        } catch (insightErr) {
+          console.error('Failed to generate health insights:', insightErr)
+          // NOVA results are still shown, just no health insights
+          setResult(prev => ({
+            ...prev,
+            health_insights: {
+              error: insightErr.message,
+              insights: {}
+            }
+          }))
+        }
+      }
     } catch (err) {
+      setAnalysisError(true)
       setError(`Analysis failed: ${err.message}`)
+      setStep('form')
+    }
+  }
+
+  const handleRetryAnalysis = async () => {
+    if (!imageFile) return
+    
+    setError(null)
+    setAnalysisError(false)
+    setStep('analyzing')
+
+    // Convert all nutrition values to numbers, defaulting blanks to 0
+    const numericNutrition = Object.fromEntries(
+      [...CORE_FIELDS, ...ADVANCED_FIELDS].map(f => [f.key, parseFloat(nutrition[f.key]) || 0])
+    )
+
+    try {
+      // Step 1: Get NOVA classification and anomaly detection (fast)
+      const analysisData = await analyzeLabel(imageFile, numericNutrition)
+      
+      // Show NOVA results immediately
+      // Set health_insights to null (loading) if enabled, undefined if disabled
+      setResult({ 
+        analysis: analysisData, 
+        health_insights: showHealthInsights ? null : undefined 
+      })
+      setStep('results')
+      
+      // Step 2: Generate AI health insights (slow, 30-40s) - only if checkbox is checked
+      if (showHealthInsights) {
+        try {
+          const insights = await generateHealthInsights(
+            analysisData,
+            userProfile || DEFAULT_DEMO_PROFILE,
+            selectedProductName || imageFile.name
+          )
+          
+          // Merge health insights into results
+          setResult(prev => ({ ...prev, health_insights: insights }))
+        } catch (insightErr) {
+          console.error('Failed to generate health insights:', insightErr)
+          // NOVA results are still shown, just no health insights
+          setResult(prev => ({
+            ...prev,
+            health_insights: {
+              error: insightErr.message,
+              insights: {}
+            }
+          }))
+        }
+      }
+    } catch (err) {
+      setAnalysisError(true)
+      setError(`Analysis failed again: ${err.message}. Please check your nutrition values or try a different image.`)
       setStep('form')
     }
   }
@@ -654,81 +1017,91 @@ const Dashboard = () => {
   const stepIndex = (id) => STEPS.findIndex(s => s.id === id)
   const activeIdx = stepIndex(step === 'analyzing' ? 'form' : step)
 
-  const StepIndicator = () => (
-    <div className="mb-8">
-      <div className="relative">
-        {/* Progress line background */}
-        <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700" 
-             style={{ marginLeft: '2rem', marginRight: '2rem' }} />
-        
-        {/* Progress line filled */}
-        <div 
-          className="absolute top-5 left-0 h-1 bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-500 ease-out"
-          style={{ 
-            marginLeft: '2rem',
-            width: `calc(${(activeIdx / (STEPS.length - 1)) * 100}% - ${activeIdx === 0 ? 2 : 4}rem)`
-          }} 
-        />
-        
-        {/* Steps */}
-        <div className="relative flex justify-between">
-          {STEPS.map((s, i) => {
-            const isActive = i === activeIdx
-            const isCompleted = i < activeIdx
-            const stepNumber = i + 1
-            
-            return (
-              <div key={s.id} className="flex flex-col items-center" style={{ flex: 1 }}>
-                {/* Step circle */}
-                <motion.div
-                  initial={false}
-                  animate={{
-                    scale: isActive ? 1.1 : 1,
-                  }}
-                  className={`
-                    w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
-                    border-4 transition-all duration-300 relative z-10
-                    ${isActive 
-                      ? 'bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-500/50' 
-                      : isCompleted
-                        ? 'bg-primary-500 border-primary-500 text-white'
-                        : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400'
-                    }
-                  `}
-                >
-                  {isCompleted ? (
-                    <CheckCircle className="w-5 h-5" />
-                  ) : (
-                    stepNumber
-                  )}
-                </motion.div>
-                
-                {/* Step label */}
-                <div className="mt-3 text-center">
-                  <p className={`text-sm font-semibold transition-colors ${
-                    isActive 
-                      ? 'text-primary-600 dark:text-primary-400' 
-                      : isCompleted
-                        ? 'text-primary-700 dark:text-primary-300'
-                        : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    {s.label.split('. ')[1] || s.label}
-                  </p>
-                  {isActive && (
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: '100%' }}
-                      className="h-0.5 bg-primary-600 dark:bg-primary-400 mt-1 rounded-full"
-                    />
-                  )}
+  const StepIndicator = () => {
+    // Step icons mapping
+    const stepIcons = {
+      upload: Upload,
+      extracting: Search,
+      form: PencilLine,
+      results: Sparkles,
+    }
+
+    return (
+      <div className="mb-8">
+        <div className="relative">
+          {/* Progress line background */}
+          <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700" 
+               style={{ marginLeft: '2rem', marginRight: '2rem' }} />
+          
+          {/* Progress line filled */}
+          <div 
+            className="absolute top-5 left-0 h-1 bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-500 ease-out"
+            style={{ 
+              marginLeft: '2rem',
+              width: `calc(${(activeIdx / (STEPS.length - 1)) * 100}% - ${activeIdx === 0 ? 2 : 4}rem)`
+            }} 
+          />
+          
+          {/* Steps */}
+          <div className="relative flex justify-between">
+            {STEPS.map((s, i) => {
+              const isActive = i === activeIdx
+              const isCompleted = i < activeIdx
+              const StepIcon = stepIcons[s.id]
+              
+              return (
+                <div key={s.id} className="flex flex-col items-center" style={{ flex: 1 }}>
+                  {/* Step circle */}
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      scale: isActive ? 1.1 : 1,
+                    }}
+                    className={`
+                      w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                      border-4 transition-all duration-300 relative z-10
+                      ${isActive 
+                        ? 'bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-500/50' 
+                        : isCompleted
+                          ? 'bg-primary-500 border-primary-500 text-white'
+                          : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400'
+                      }
+                    `}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : StepIcon ? (
+                      <StepIcon className="w-5 h-5" />
+                    ) : null}
+                  </motion.div>
+                  
+                  {/* Step label */}
+                  <div className="mt-3 text-center">
+                    <p className={`text-sm font-semibold transition-colors ${
+                      isActive 
+                        ? 'text-primary-600 dark:text-primary-400' 
+                        : isCompleted
+                          ? 'text-primary-700 dark:text-primary-300'
+                          : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {s.label.split('. ')[1] || s.label}
+                    </p>
+                    {isActive && (
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: '100%' }}
+                        className="h-0.5 bg-primary-600 dark:bg-primary-400 mt-1 rounded-full"
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -743,6 +1116,49 @@ const Dashboard = () => {
         <p className="text-base text-gray-600 dark:text-gray-300 mb-3">
           Upload a food label photo and the AI reads the nutrition facts automatically and classifies the product.
         </p>
+        
+        {/* Status Indicators */}
+        <div className="flex items-center justify-center gap-3 mt-2 flex-wrap">
+          {/* API Status */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            {apiStatus === 'checking' ? (
+              <>
+                <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Checking API...</span>
+              </>
+            ) : apiStatus === 'online' ? (
+              <>
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-400">API Online</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-400">API Offline</span>
+              </>
+            )}
+          </div>
+          
+          {/* AI Model Status */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            {aiStatus === 'checking' ? (
+              <>
+                <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Checking AI...</span>
+              </>
+            ) : aiStatus === 'online' ? (
+              <>
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-xs font-medium text-blue-700 dark:text-blue-400">{aiModel} Online</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-400">AI Offline</span>
+              </>
+            )}
+          </div>
+        </div>
       </motion.div>
 
       <StepIndicator />
@@ -754,10 +1170,21 @@ const Dashboard = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm"
+            className="flex items-center justify-between gap-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm"
           >
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-            {error}
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+            {(ocrError || analysisError) && (
+              <button
+                onClick={ocrError ? handleRetryOcr : handleRetryAnalysis}
+                className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors flex-shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Retry {ocrError ? 'OCR' : 'Analysis'}
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -839,12 +1266,12 @@ const Dashboard = () => {
                       key={sample.id}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => handleSampleImageSelect(sample.url)}
+                      onClick={() => handleSampleImageSelect(sample)}
                       className="cursor-pointer group"
                     >
                       <div className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 group-hover:border-primary-500 transition-all shadow-sm group-hover:shadow-lg">
                         <img
-                          src={sample.url}
+                          src={sample.labelUrl}
                           alt={sample.name}
                           className="w-full h-full object-cover"
                         />
@@ -854,7 +1281,14 @@ const Dashboard = () => {
                           </div>
                         </div>
                       </div>
-                      <p className="text-center text-xs text-gray-600 dark:text-gray-400 mt-2">{sample.name}</p>
+                      <div className="mt-2 px-2 py-1.5 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/30 dark:to-primary-800/30 rounded-lg border border-primary-200 dark:border-primary-700 shadow-sm">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+                          <p className="text-xs font-medium text-primary-900 dark:text-primary-100 truncate">
+                            {sample.name}
+                          </p>
+                        </div>
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -958,24 +1392,105 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* Step 2: OCR extracting spinner */}
+        {/* Step 2: OCR extracting with animated transition */}
         {step === 'extracting' && (
           <motion.div
             key="extracting"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="card p-16 flex flex-col items-center gap-6 text-center"
+            className="card p-12 flex flex-col items-center gap-6 text-center"
           >
-            <div className="relative">
-              <img src={imagePreview} alt="label" className="w-32 h-32 object-cover rounded-2xl opacity-60" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Loader className="w-12 h-12 text-primary-500 animate-spin" />
+            <div className="relative w-64 h-64" style={{ perspective: '1000px' }}>
+              {/* Image container with flip animation (only for sample products with product images) */}
+              <div className="relative w-full h-full">
+                {selectedProductName ? (
+                  // Sample product: show flip animation from product to label
+                  <AnimatePresence mode="wait">
+                    {showingLabel ? (
+                      <motion.div
+                        key="label"
+                        initial={{ opacity: 0, rotateY: -90 }}
+                        animate={{ opacity: 1, rotateY: 0 }}
+                        exit={{ opacity: 0, rotateY: 90 }}
+                        transition={{ duration: 0.6, ease: 'easeInOut' }}
+                        className="absolute inset-0"
+                      >
+                        <img 
+                          src={imagePreview} 
+                          alt="nutrition label" 
+                          className="w-full h-full object-cover rounded-2xl shadow-2xl" 
+                        />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="product"
+                        initial={{ opacity: 0, rotateY: 90 }}
+                        animate={{ opacity: 1, rotateY: 0 }}
+                        exit={{ opacity: 0, rotateY: -90 }}
+                        transition={{ duration: 0.6, ease: 'easeInOut' }}
+                        className="absolute inset-0"
+                      >
+                        {SAMPLE_IMAGES.find(s => s.name === selectedProductName) && (
+                          <img 
+                            src={SAMPLE_IMAGES.find(s => s.name === selectedProductName).productUrl} 
+                            alt={selectedProductName} 
+                            className="w-full h-full object-cover rounded-2xl shadow-2xl" 
+                          />
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                ) : (
+                  // Uploaded image: show label directly (no product image pair)
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4 }}
+                    className="w-full h-full"
+                  >
+                    <img 
+                      src={imagePreview} 
+                      alt="nutrition label" 
+                      className="w-full h-full object-cover rounded-2xl shadow-2xl" 
+                    />
+                  </motion.div>
+                )}
+                
+                {/* Scanning overlay with spinner */}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: selectedProductName ? (showingLabel ? 1 : 0) : 1 }}
+                  className="absolute inset-0 bg-black bg-opacity-40 rounded-2xl flex items-center justify-center"
+                >
+                  <Loader className="w-16 h-16 text-white animate-spin" />
+                </motion.div>
               </div>
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-1">Reading Nutrition Facts…</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">OCR is scanning your food label image</p>
+            
+            <div className="space-y-2">
+              <motion.h3 
+                key={selectedProductName ? (showingLabel ? 'scanning' : 'analyzing') : 'uploaded'}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-2xl font-bold text-gray-800 dark:text-gray-100"
+              >
+                {selectedProductName 
+                  ? (showingLabel ? 'Reading Nutrition Facts…' : `Analyzing ${selectedProductName}`)
+                  : 'Reading Nutrition Facts…'
+                }
+              </motion.h3>
+              <motion.p 
+                key={selectedProductName ? (showingLabel ? 'ocr' : 'loading') : 'uploaded-ocr'}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-sm text-gray-500 dark:text-gray-400"
+              >
+                {selectedProductName
+                  ? (showingLabel ? 'OCR is scanning the nutrition label' : 'Preparing product image for analysis')
+                  : 'OCR is scanning your uploaded nutrition label'
+                }
+              </motion.p>
             </div>
           </motion.div>
         )}
@@ -1003,8 +1518,44 @@ const Dashboard = () => {
                   </button>
                 </div>
 
-                {/* Form fields */}
+                {/* Form fields with tabs */}
                 <div className="lg:col-span-2 space-y-4">
+                  {/* Tab Navigation */}
+                  <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setReviewTab('nutrition')}
+                      className={`flex-1 px-4 py-2 rounded-md font-semibold text-sm transition-all ${
+                        reviewTab === 'nutrition'
+                          ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      <FlaskConical className="w-4 h-4 inline-block mr-2" />
+                      Nutrition Facts
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReviewTab('profile')}
+                      className={`flex-1 px-4 py-2 rounded-md font-semibold text-sm transition-all ${
+                        reviewTab === 'profile'
+                          ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      <User className="w-4 h-4 inline-block mr-2" />
+                      Your Profile
+                    </button>
+                  </div>
+
+                  {/* Nutrition Facts Tab */}
+                  {reviewTab === 'nutrition' && (
+                    <motion.div
+                      key="nutrition-tab"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                    >
                   {/* OCR summary banner */}
                   {ocrFieldCount > 0 ? (
                     <div className="flex items-start gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 px-4 py-3 rounded-xl text-sm">
@@ -1075,6 +1626,181 @@ const Dashboard = () => {
                       )}
                     </AnimatePresence>
                   </div>
+                    </motion.div>
+                  )}
+
+                  {/* Profile Tab */}
+                  {reviewTab === 'profile' && (
+                    <motion.div
+                      key="profile-tab"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="space-y-4"
+                    >
+                      {userProfile ? (
+                        <>
+                          <div className="card p-5">
+                            <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                              <User className="w-5 h-5 text-primary-600" />
+                              Personal Information
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Name</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-100">{userProfile.name || 'Not set'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Age</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-100">{userProfile.age || 'Not set'} years</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Gender</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-100 capitalize">{userProfile.gender || 'Not set'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Activity Level</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-100 capitalize">{userProfile.activityLevel || 'Not set'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Height</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-100">{userProfile.height ? `${userProfile.height} in (${(userProfile.height * 2.54).toFixed(1)} cm)` : 'Not set'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Weight</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-100">{userProfile.weight ? `${userProfile.weight} lbs (${(userProfile.weight * 0.453592).toFixed(1)} kg)` : 'Not set'}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {userProfile.medicalConditions?.length > 0 && (
+                            <div className="card p-5">
+                              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                                <Heart className="w-5 h-5 text-red-600" />
+                                Medical Conditions
+                              </h3>
+                              <div className="flex flex-wrap gap-2">
+                                {userProfile.medicalConditions.map((condition, idx) => (
+                                  <span key={idx} className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-sm font-medium border border-red-200 dark:border-red-800">
+                                    {condition}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {userProfile.allergies?.length > 0 && (
+                            <div className="card p-5">
+                              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                                Allergies
+                              </h3>
+                              <div className="flex flex-wrap gap-2">
+                                {userProfile.allergies.map((allergy, idx) => (
+                                  <span key={idx} className="px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded-lg text-sm font-medium border border-amber-200 dark:border-amber-800">
+                                    {allergy}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {userProfile.dietaryPreferences?.length > 0 && (
+                            <div className="card p-5">
+                              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                                <Activity className="w-5 h-5 text-green-600" />
+                                Dietary Preferences
+                              </h3>
+                              <div className="flex flex-wrap gap-2">
+                                {userProfile.dietaryPreferences.map((pref, idx) => (
+                                  <span key={idx} className="px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg text-sm font-medium border border-green-200 dark:border-green-800">
+                                    {pref}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {userProfile.healthGoals && (
+                            <div className="card p-5">
+                              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-primary-600" />
+                                Health Goals
+                              </h3>
+                              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                {userProfile.healthGoals}
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="card p-8 text-center">
+                          <User className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                          <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-2">No Profile Found</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Create your health profile to get personalized nutrition insights.
+                          </p>
+                          <a
+                            href="#/profile"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create Profile
+                          </a>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* Health Insights Toggle */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="card p-4 bg-gradient-to-br from-primary-50/50 to-blue-50/50 dark:from-primary-900/10 dark:to-blue-900/10 border-2 border-primary-200 dark:border-primary-800"
+                  >
+                    <label className="flex items-center gap-4 cursor-pointer group">
+                      <div className="relative flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={showHealthInsights}
+                          onChange={(e) => setShowHealthInsights(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-14 h-7 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-primary-500 peer-checked:to-blue-500 transition-all duration-300 shadow-inner"></div>
+                        <div className="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 peer-checked:translate-x-7 peer-checked:shadow-lg flex items-center justify-center">
+                          {showHealthInsights ? (
+                            <Sparkles className="w-3.5 h-3.5 text-primary-600" />
+                          ) : (
+                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-900 dark:text-gray-100">
+                            AI Health Insights
+                          </span>
+                          {showHealthInsights && (
+                            <span className="px-2 py-0.5 bg-primary-500 text-white text-xs font-semibold rounded-full animate-pulse">
+                              ON
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          {showHealthInsights ? (
+                            <>
+                              <span className="inline-flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                Generate personalized health analysis (adds ~30-40s)
+                              </span>
+                            </>
+                          ) : (
+                            'Quick analysis only (NOVA classification + anomaly detection)'
+                          )}
+                        </p>
+                      </div>
+                    </label>
+                  </motion.div>
 
                   {/* Submit */}
                   <motion.button
@@ -1087,7 +1813,7 @@ const Dashboard = () => {
                     {step === 'analyzing' ? (
                       <>
                         <Loader className="w-5 h-5 animate-spin" />
-                        Analysing with AI models…
+                        Running NOVA Classification…
                       </>
                     ) : (
                       <>
@@ -1096,6 +1822,16 @@ const Dashboard = () => {
                       </>
                     )}
                   </motion.button>
+                  
+                  {step === 'analyzing' && (
+                    <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2">
+                      {showHealthInsights ? (
+                        'Analyzing nutrition data. Results will show immediately, followed by AI health insights (30-40s).'
+                      ) : (
+                        'Running quick analysis (NOVA classification + anomaly detection)...'
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
             </form>
@@ -1105,7 +1841,7 @@ const Dashboard = () => {
         {/* Step 4: Results */}
         {step === 'results' && result && (
           <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <ResultsPanel result={result} imagePreview={imagePreview} onReset={handleReset} />
+            <ResultsPanel result={result} imagePreview={imagePreview} productName={selectedProductName} onReset={handleReset} />
           </motion.div>
         )}
       </AnimatePresence>

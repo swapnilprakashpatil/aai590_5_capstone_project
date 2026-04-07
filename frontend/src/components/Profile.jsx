@@ -1,26 +1,52 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { User, Heart, Activity, Ruler, Weight, Calendar, AlertCircle, Save, Check, Plus, X } from 'lucide-react'
 
-const Profile = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    age: '',
-    height: '',
-    weight: '',
-    gender: '',
-    activityLevel: 'moderate',
-    medicalConditions: [],
-    allergies: [],
-    dietaryPreferences: [],
-    healthGoals: '',
-  })
+// Utility functions for unit conversion
+const inchesToCm = (inches) => inches * 2.54
+const cmToInches = (cm) => cm / 2.54
+const lbsToKg = (lbs) => lbs * 0.453592
+const kgToLbs = (kg) => kg / 0.453592
 
+// Default profile matching the health insights API
+const DEFAULT_PROFILE = {
+  name: 'Alex Morgan',
+  age: '35',
+  height: '69', // inches (175 cm)
+  weight: '165', // lbs (75 kg)
+  gender: 'male',
+  activityLevel: 'moderate',
+  medicalConditions: ['Hypertension', 'Type 2 Diabetes'],
+  allergies: ['Peanuts', 'Shellfish'],
+  dietaryPreferences: ['Low Sodium', 'High Fiber'],
+  healthGoals: 'Manage blood sugar levels and reduce sodium intake for better cardiovascular health',
+}
+
+const Profile = () => {
+  const [formData, setFormData] = useState(DEFAULT_PROFILE)
   const [saved, setSaved] = useState(false)
   const [errors, setErrors] = useState({})
   const [newCondition, setNewCondition] = useState('')
   const [newAllergy, setNewAllergy] = useState('')
   const [newDietPref, setNewDietPref] = useState('')
+
+  // Load saved profile on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('userProfile')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        setFormData({ ...DEFAULT_PROFILE, ...parsed })
+      } catch (e) {
+        console.error('Failed to load profile:', e)
+        setFormData(DEFAULT_PROFILE)
+      }
+    } else {
+      // Use default profile and save it for demo purposes
+      setFormData(DEFAULT_PROFILE)
+      localStorage.setItem('userProfile', JSON.stringify(DEFAULT_PROFILE))
+    }
+  }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -84,8 +110,20 @@ const Profile = () => {
       return
     }
 
-    // Save to localStorage or send to backend
-    localStorage.setItem('userProfile', JSON.stringify(formData))
+    // Save to localStorage (storing in imperial for UI, but also save metric conversion for API)
+    const profileForStorage = {
+      ...formData,
+      // Add metric conversions for API compatibility
+      height_cm: Math.round(inchesToCm(parseFloat(formData.height))),
+      weight_kg: Math.round(lbsToKg(parseFloat(formData.weight))),
+      health_conditions: formData.medicalConditions,
+      dietary_restrictions: formData.allergies,
+      goals: formData.healthGoals ? [formData.healthGoals] : [],
+      activity_level: formData.activityLevel,
+      family_history: [], // Could be added in future
+    }
+    
+    localStorage.setItem('userProfile', JSON.stringify(profileForStorage))
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }

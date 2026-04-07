@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { User, LayoutDashboard, Sparkles } from 'lucide-react'
+import { User, LayoutDashboard, Sparkles, Brain } from 'lucide-react'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
