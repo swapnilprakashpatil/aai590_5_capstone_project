@@ -22,12 +22,13 @@ import {
   Heart,
   Activity,
   Plus,
+  Calculator,
 } from 'lucide-react'
 import { analyzeLabel, extractNutrition, checkApiHealth, checkAIHealth, analyzeWithInsights, generateHealthInsights } from '../api'
 
 // Nutrition field definitions
 const CORE_FIELDS = [
-  { key: 'energy_100g',        label: 'Energy (kJ)',          unit: 'kJ',   required: true,  placeholder: '1500', hint: 'Total energy per 100g/100ml in kilojoules' },
+  { key: 'energy_100g',        label: 'Energy (kJ)',          unit: 'kJ',   required: true,  placeholder: '1500', hint: 'Total energy per 100g/100ml in kilojoules. US labels show Calories: multiply cal × 4.184 to get kJ' },
   { key: 'fat_100g',           label: 'Total Fat',            unit: 'g',    required: true,  placeholder: '5.0' },
   { key: 'saturated_fat_100g', label: 'Saturated Fat',        unit: 'g',    required: true,  placeholder: '2.0' },
   { key: 'carbohydrates_100g', label: 'Carbohydrates',        unit: 'g',    required: true,  placeholder: '30.0' },
@@ -99,7 +100,7 @@ const NOVA_INFO = [
 
 // Sub-components
 
-function NutritionField({ field, value, onChange, autoDetected = false }) {
+function NutritionField({ field, value, onChange, autoDetected = false, originalValue = null }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1">
@@ -139,6 +140,12 @@ function NutritionField({ field, value, onChange, autoDetected = false }) {
         `}
         required={field.required}
       />
+      {originalValue && (
+        <span className="text-[10px] text-blue-600 dark:text-blue-400 italic">
+          From label: {originalValue}{field.unit && ` ${field.unit}`} {field.key !== 'additives_n' && '(per serving)'}
+          {field.key === 'energy_100g' && ` = ${Math.round(originalValue / 4.184)} cal`}
+        </span>
+      )}
     </div>
   )
 }
@@ -379,12 +386,6 @@ function ResultsPanel({ result, imagePreview, productName, onReset }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          {productName && (
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-              <h3 className="text-lg font-bold text-primary-600 dark:text-primary-400">{productName}</h3>
-            </div>
-          )}
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Analysis Results</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">AI-powered nutritional assessment complete</p>
         </div>
@@ -401,12 +402,18 @@ function ResultsPanel({ result, imagePreview, productName, onReset }) {
         {/* Left — image + grade badges */}
         <div className="space-y-4">
           {imagePreview && (
-            <div className="card overflow-hidden">
-              <img 
+            <div className="space-y-2">
+              {/* Product name badge */}
+              {productName && (
+                <div className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-blue-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
+                  <Sparkles className="w-5 h-5 flex-shrink-0" />
+                  <p className="font-bold text-sm line-clamp-1 flex-1">{productName}</p>
+                </div>
+              )}
+              <ImageMagnifier 
                 src={imagePreview} 
-                alt="Food label" 
-                style={{ maxHeight: '256px' }}
-                className="w-full object-contain bg-gray-50 dark:bg-gray-800" 
+                alt={productName || "Food label"} 
+                maxHeight={320}
               />
             </div>
           )}
@@ -631,6 +638,8 @@ const Dashboard = () => {
   const [nutrition, setNutrition] = useState(DEFAULT_VALUES)
   const [autoFields, setAutoFields] = useState({})    // fields detected by OCR
   const [ocrFieldCount, setOcrFieldCount] = useState(0)
+  const [ocrOriginalValues, setOcrOriginalValues] = useState({})  // original OCR values before conversion
+  const [ocrServingSize, setOcrServingSize] = useState(null)      // serving size detected by OCR
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
@@ -698,9 +707,10 @@ const Dashboard = () => {
       const result = await checkAIHealth()
       if (result.status === 'ok') {
         setAiStatus('online')
-        setAiModel(result.model || 'AI Model')
+        setAiModel('AI Agent')
       } else {
         setAiStatus('offline')
+        setAiModel('AI Agent')
       }
     }
     
@@ -781,6 +791,8 @@ const Dashboard = () => {
       setNutrition(prefilled)
       setAutoFields(ocr.auto_fields || {})
       setOcrFieldCount(ocr.fields_found || 0)
+      setOcrOriginalValues(ocr.original_values || {})
+      setOcrServingSize(ocr.serving_size_g || null)
       // Expand advanced section if OCR found any advanced fields
       const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
       if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
@@ -829,6 +841,8 @@ const Dashboard = () => {
       setNutrition(prefilled)
       setAutoFields(ocr.auto_fields || {})
       setOcrFieldCount(ocr.fields_found || 0)
+      setOcrOriginalValues(ocr.original_values || {})
+      setOcrServingSize(ocr.serving_size_g || null)
       
       const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
       if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
@@ -860,6 +874,8 @@ const Dashboard = () => {
       setNutrition(prefilled)
       setAutoFields(ocr.auto_fields || {})
       setOcrFieldCount(ocr.fields_found || 0)
+      setOcrOriginalValues(ocr.original_values || {})
+      setOcrServingSize(ocr.serving_size_g || null)
       
       const advancedKeys = ADVANCED_FIELDS.map(f => f.key)
       if (advancedKeys.some(k => ocr.auto_fields?.[k])) setShowAdvanced(true)
@@ -1503,11 +1519,20 @@ const Dashboard = () => {
                 {/* Image preview column */}
                 <div className="space-y-3">
                   {imagePreview && (
-                    <ImageMagnifier 
-                      src={imagePreview} 
-                      alt="Food label" 
-                      maxHeight={288}
-                    />
+                    <div className="space-y-2">
+                      {/* Product name badge */}
+                      {selectedProductName && (
+                        <div className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-blue-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
+                          <Sparkles className="w-5 h-5 flex-shrink-0" />
+                          <p className="font-bold text-sm line-clamp-1 flex-1">{selectedProductName}</p>
+                        </div>
+                      )}
+                      <ImageMagnifier 
+                        src={imagePreview} 
+                        alt={selectedProductName || "Food label"} 
+                        maxHeight={288}
+                      />
+                    </div>
                   )}
                   <button
                     type="button"
@@ -1576,6 +1601,42 @@ const Dashboard = () => {
                     </div>
                   )}
 
+                  {/* OCR calculation explanation */}
+                  <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-xl text-xs">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold">How OCR calculates values:</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300/90">
+                        <li>Extracts nutrition values and serving size from the label image</li>
+                        <li>Detects serving size automatically (e.g., "28g per serving")</li>
+                        <li>Converts per-serving values to <strong>per 100g</strong> using: <code className="bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded text-xs">value × (100 ÷ serving_size)</code></li>
+                        <li>Example: 8g fat per 28g serving → 8 × (100 ÷ 28) = <strong>28.6g per 100g</strong></li>
+                        <li className="text-blue-600 dark:text-blue-400"><strong>Note:</strong> For US labels, manually convert Calories → kJ and Sodium → Salt first (see guide below)</li>
+                      </ul>
+                      <p className="text-blue-600 dark:text-blue-400 italic mt-1">💡 All values need to be per 100g for accurate NOVA classification</p>
+                    </div>
+                  </div>
+
+                  {/* US Label Conversion Guide */}
+                  <div className="flex items-start gap-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 px-4 py-3 rounded-xl text-xs">
+                    <Calculator className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold">📋 Converting US Nutrition Labels:</p>
+                      <p className="text-purple-700 dark:text-purple-300/90">US labels show Calories and Sodium - use these conversions:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                        <div className="bg-purple-100 dark:bg-purple-900/30 px-2 py-1.5 rounded">
+                          <strong>Energy:</strong> Calories × 4.184 = kJ<br/>
+                          <span className="text-[10px] opacity-80">Example: 150 cal × 4.184 = 628 kJ</span>
+                        </div>
+                        <div className="bg-purple-100 dark:bg-purple-900/30 px-2 py-1.5 rounded">
+                          <strong>Salt:</strong> Sodium (mg) × 2.5 ÷ 1000 = Salt (g)<br/>
+                          <span className="text-[10px] opacity-80">Example: 210mg × 2.5 ÷ 1000 = 0.53g</span>
+                        </div>
+                      </div>
+                      <p className="text-purple-600 dark:text-purple-400 italic mt-1">💡 Then use the per-100g conversion formula above</p>
+                    </div>
+                  </div>
+
                   <div className="card p-5">
                     <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4">
                       Core Nutrition Facts <span className="text-red-500 text-sm font-normal">(required)</span>
@@ -1588,6 +1649,7 @@ const Dashboard = () => {
                           value={nutrition[field.key]}
                           onChange={handleFieldChange}
                           autoDetected={!!autoFields[field.key]}
+                          originalValue={ocrOriginalValues[field.key] || null}
                         />
                       ))}
                     </div>
@@ -1619,6 +1681,7 @@ const Dashboard = () => {
                                 value={nutrition[field.key]}
                                 onChange={handleFieldChange}
                                 autoDetected={!!autoFields[field.key]}
+                                originalValue={ocrOriginalValues[field.key] || null}
                               />
                             ))}
                           </div>

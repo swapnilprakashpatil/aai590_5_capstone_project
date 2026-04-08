@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || 'https://nutrivision-api-sp2026.azurewebsites.net' //"http://localhost:8000";
 
 /**
  * Check if the API backend is online
