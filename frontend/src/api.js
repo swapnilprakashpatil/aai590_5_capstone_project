@@ -42,19 +42,31 @@ export async function extractNutrition(imageFile) {
   const form = new FormData();
   form.append("file", imageFile);
 
-  const response = await fetch(`${API_BASE}/extract`, {
-    method: "POST",
-    body: form,
-  });
+  try {
+    const response = await fetch(`${API_BASE}/extract`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30000), // 30 second timeout for OCR
+    });
 
-  if (!response.ok) {
-    const err = await response
-      .json()
-      .catch(() => ({ detail: "Unknown error" }));
-    throw new Error(err.detail || `HTTP ${response.status}`);
+    if (!response.ok) {
+      const err = await response
+        .json()
+        .catch(() => ({ detail: "Unknown error" }));
+      throw new Error(err.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    // Handle network errors specifically
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - API took too long to respond');
+    }
+    if (error.message?.includes('fetch')) {
+      throw new Error('Failed to fetch - Unable to connect to API');
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 /**

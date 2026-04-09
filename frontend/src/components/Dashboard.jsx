@@ -780,6 +780,12 @@ const Dashboard = () => {
     setStep('extracting')
 
     try {
+      // Check API health before attempting OCR
+      const isApiOnline = await checkApiHealth()
+      if (!isApiOnline) {
+        throw new Error('API_OFFLINE')
+      }
+
       const ocr = await extractNutrition(file)
       // Pre-fill form with extracted values; keep empty string for missed fields
       const prefilled = { ...DEFAULT_VALUES }
@@ -800,7 +806,16 @@ const Dashboard = () => {
     } catch (err) {
       // OCR failed — show error with retry option
       setOcrError(true)
-      setError(`OCR extraction failed: ${err.message || 'Network error'}. You can retry or enter values manually.`)
+      
+      // Show specific error message for API offline
+      if (err.message === 'API_OFFLINE') {
+        setError('⚠️ API is offline - Cannot process OCR request. Please try again later or enter nutrition values manually.')
+      } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('⚠️ Network error - Cannot connect to API. Please check your internet connection or try again later.')
+      } else {
+        setError(`OCR extraction failed: ${err.message || 'Unknown error'}. You can retry or enter values manually.`)
+      }
+      
       setAutoFields({})
       setOcrFieldCount(0)
       setStep('form')
@@ -821,6 +836,12 @@ const Dashboard = () => {
     }, 1500)
 
     try {
+      // Check API health before attempting OCR
+      const isApiOnline = await checkApiHealth()
+      if (!isApiOnline) {
+        throw new Error('API_OFFLINE')
+      }
+
       // Fetch the label image (for OCR) and convert to File object
       const response = await fetch(sample.labelUrl)
       const blob = await response.blob()
@@ -849,7 +870,16 @@ const Dashboard = () => {
       setStep('form')
     } catch (err) {
       setOcrError(true)
-      setError(`OCR extraction failed: ${err.message || 'Network error'}. You can retry or enter values manually.`)
+      
+      // Show specific error message for API offline
+      if (err.message === 'API_OFFLINE') {
+        setError('⚠️ API is offline - Cannot process OCR request. Please try again later or enter nutrition values manually.')
+      } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('⚠️ Network error - Cannot connect to API. Please check your internet connection or try again later.')
+      } else {
+        setError(`OCR extraction failed: ${err.message || 'Unknown error'}. You can retry or enter values manually.`)
+      }
+      
       setAutoFields({})
       setOcrFieldCount(0)
       setStep('form')
@@ -864,6 +894,12 @@ const Dashboard = () => {
     setStep('extracting')
 
     try {
+      // Check API health before attempting OCR retry
+      const isApiOnline = await checkApiHealth()
+      if (!isApiOnline) {
+        throw new Error('API_OFFLINE')
+      }
+
       const ocr = await extractNutrition(imageFile)
       const prefilled = { ...DEFAULT_VALUES }
       if (ocr.extracted) {
@@ -882,7 +918,16 @@ const Dashboard = () => {
       setStep('form')
     } catch (err) {
       setOcrError(true)
-      setError(`OCR extraction failed again: ${err.message || 'Network error'}. Please enter values manually.`)
+      
+      // Show specific error message for API offline
+      if (err.message === 'API_OFFLINE') {
+        setError('⚠️ API is offline - Cannot process OCR request. Please try again later or enter nutrition values manually.')
+      } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('⚠️ Network error - Cannot connect to API. Please check your internet connection or try again later.')
+      } else {
+        setError(`OCR extraction failed again: ${err.message || 'Unknown error'}. Please enter values manually.`)
+      }
+      
       setAutoFields({})
       setOcrFieldCount(0)
       setStep('form')
