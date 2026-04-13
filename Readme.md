@@ -39,6 +39,7 @@ An end-to-end machine learning system for predicting food processing tiers (NOVA
 - [Contributing](#contributing)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
+- [AI Use Disclosure](#ai-use-disclosure)
 - [Contact](#contact)
 
 ## UI Demo
@@ -48,18 +49,21 @@ An end-to-end machine learning system for predicting food processing tiers (NOVA
 ## Key Features
 
 ### 🎯 NOVA Classification
+
 - **4-tier processing level prediction** (Unprocessed → Ultra-processed)
 - **XGBoost classifier** with 85.7% macro F1 score
 - **SHAP explainability** showing feature importance
 - **Confidence scores** for model predictions
 
 ### 🔍 Anomaly Detection
+
 - **Three complementary models** (Isolation Forest, One-Class SVM, LOF)
 - **Whole-food baseline** trained exclusively on NOVA 1 products
 - **Nutritional outlier identification** across all processing tiers
 - **Real-time anomaly flagging** with severity scores
 
 ### 🤖 Multi-Agent Health Insights
+
 - **6 specialized AI agents** running in parallel via Azure OpenAI
 - **Personalized recommendations** based on health profile
 - **Evidence-based rationale** with citations
@@ -67,12 +71,14 @@ An end-to-end machine learning system for predicting food processing tiers (NOVA
 - **Product alternatives** with specific suggestions
 
 ### 📸 OCR & Image Processing
+
 - **Nutrition label text extraction** from photos
 - **Smart field mapping** to nutritional attributes
 - **Unit normalization** for consistent analysis
 - **Batch processing** support
 
 ### 🎨 Interactive Web Interface
+
 - **Sample product gallery** with 12+ pre-loaded items
 - **3-step demo workflow** (Profile → Product → Insights)
 - **Real-time processing** with progress indicators
@@ -82,7 +88,9 @@ An end-to-end machine learning system for predicting food processing tiers (NOVA
 ## Quick Start
 
 ### Try the Live Demo (No Installation)
+
 Visit https://swapnilprakashpatil.github.io/aai590_5_capstone_project/ to:
+
 - Upload nutrition labels for instant NOVA classification
 - Explore sample products with pre-loaded labels
 - See anomaly detection in action
@@ -90,12 +98,14 @@ Visit https://swapnilprakashpatil.github.io/aai590_5_capstone_project/ to:
 ### Run Locally (Full System)
 
 **1. Clone the Repository**
+
 ```powershell
 git clone https://github.com/SwapnilPrakashPatil/aai590_5_capstone_project.git
 cd aai590_5_capstone_project
 ```
 
 **2. Set Up Python Environment**
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -103,12 +113,14 @@ pip install -r requirements.txt
 ```
 
 **3. Download Dataset** (Optional - only for notebooks)
+
 ```powershell
 Invoke-WebRequest -Uri "https://world.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz" -OutFile "dataset/en.openfoodfacts.org.products.csv.gz"
 # Extract to dataset/ folder
 ```
 
 **4. Run Backend API**
+
 ```powershell
 cd backend
 # Optional: Configure .env for multi-agent insights
@@ -117,6 +129,7 @@ python main.py
 ```
 
 **5. Run Frontend**
+
 ```powershell
 cd frontend
 npm install
@@ -125,6 +138,7 @@ npm run dev
 ```
 
 **6. Explore Notebooks** (Optional)
+
 ```powershell
 jupyter notebook
 # Open 01_Exploratory_Data_Analysis.ipynb and run sequentially
@@ -148,6 +162,7 @@ Moving beyond traditional calorie/macro tracking to provide quality signals thro
 ## Technology Stack
 
 ### Machine Learning & Data Science
+
 - **ML Framework:** XGBoost, scikit-learn, LightGBM
 - **Anomaly Detection:** Isolation Forest, One-Class SVM, Local Outlier Factor
 - **Explainability:** SHAP (SHapley Additive exPlanations)
@@ -156,6 +171,7 @@ Moving beyond traditional calorie/macro tracking to provide quality signals thro
 - **Visualization:** Matplotlib, Plotly, Seaborn
 
 ### Backend
+
 - **API Framework:** FastAPI with async support
 - **AI Orchestration:** Multi-agent system with parallel execution
 - **LLM Integration:** Azure OpenAI (GPT-4)
@@ -163,6 +179,7 @@ Moving beyond traditional calorie/macro tracking to provide quality signals thro
 - **Server:** Uvicorn (ASGI) / Gunicorn (production)
 
 ### Frontend
+
 - **Framework:** React 18 with Vite
 - **Styling:** Tailwind CSS
 - **HTTP Client:** Axios
@@ -170,6 +187,7 @@ Moving beyond traditional calorie/macro tracking to provide quality signals thro
 - **Build Tool:** Vite
 
 ### Development & Deployment
+
 - **Notebooks:** Jupyter Lab
 - **Version Control:** Git
 - **Cloud Platform:** Azure (App Service, OpenAI)
@@ -180,13 +198,13 @@ Moving beyond traditional calorie/macro tracking to provide quality signals thro
 
 The project follows a five-notebook pipeline, each building on artifacts from the previous step:
 
-| # | Notebook | Purpose |
-|---|----------|---------|
-| 1 | `01_Exploratory_Data_Analysis.ipynb` | Data quality assessment, target/feature distributions, correlation analysis, outlier detection, missing-data imputation, and cleaned parquet export. |
-| 2 | `02_Feature_Engineering_and_Model_Preperation.ipynb` | Feature selection, engineered ratio features (e.g. sugar/fiber, fat/protein, additives/energy), train/val/test split, scaling, and XGBoost baseline. |
-| 3 | `03_Model_Training_and_Evaluation.ipynb` | Comparative evaluation of Random Forest, XGBoost, MLP, and LightGBM under consistent metrics; XGBoost selected as best candidate (Macro F1 = 0.856). |
-| 4 | `04_Hyperparameter_Tuning_and_Final_Evaluation.ipynb` | Bayesian hyperparameter tuning with Optuna, held-out test evaluation, and SHAP explainability analysis. |
-| 5 | `05_Anomaly_Detection.ipynb` | Train three anomaly detection models (Isolation Forest, One-Class SVM, Local Outlier Factor) exclusively on NOVA 1 whole foods to identify nutritionally unusual products across all processing tiers. |
+| #   | Notebook                                              | Purpose                                                                                                                                                                                                |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `01_Exploratory_Data_Analysis.ipynb`                  | Data quality assessment, target/feature distributions, correlation analysis, outlier detection, missing-data imputation, and cleaned parquet export.                                                   |
+| 2   | `02_Feature_Engineering_and_Model_Preperation.ipynb`  | Feature selection, engineered ratio features (e.g. sugar/fiber, fat/protein, additives/energy), train/val/test split, scaling, and XGBoost baseline.                                                   |
+| 3   | `03_Model_Training_and_Evaluation.ipynb`              | Comparative evaluation of Random Forest, XGBoost, MLP, and LightGBM under consistent metrics; XGBoost selected as best candidate (Macro F1 = 0.856).                                                   |
+| 4   | `04_Hyperparameter_Tuning_and_Final_Evaluation.ipynb` | Bayesian hyperparameter tuning with Optuna, held-out test evaluation, and SHAP explainability analysis.                                                                                                |
+| 5   | `05_Anomaly_Detection.ipynb`                          | Train three anomaly detection models (Isolation Forest, One-Class SVM, Local Outlier Factor) exclusively on NOVA 1 whole foods to identify nutritionally unusual products across all processing tiers. |
 
 Run notebooks in order — each one saves artifacts consumed by the next.
 
@@ -198,14 +216,14 @@ The backend implements a sophisticated multi-agent system that transforms model 
 
 The `HealthInsightsOrchestrator` coordinates six specialized AI agents running in parallel via Azure OpenAI:
 
-| Agent | Purpose |
-|-------|---------|
-| **Nutritional Analysis Expert** | Detailed breakdown of macronutrients, micronutrients, and nutritional adequacy |
-| **Health Risk Assessment Expert** | Identifies potential health risks based on product composition and user profile |
-| **Dietary Recommendations Specialist** | Personalized nutrition guidance aligned with health conditions and goals |
-| **Product Alternatives Advisor** | Suggests healthier alternatives with specific product recommendations |
-| **Long-Term Health Impact Analyst** | Projects long-term health outcomes of regular consumption |
-| **Technical Analysis Agent** | Explains AI reasoning, model confidence, and agent orchestration process |
+| Agent                                  | Purpose                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| **Nutritional Analysis Expert**        | Detailed breakdown of macronutrients, micronutrients, and nutritional adequacy  |
+| **Health Risk Assessment Expert**      | Identifies potential health risks based on product composition and user profile |
+| **Dietary Recommendations Specialist** | Personalized nutrition guidance aligned with health conditions and goals        |
+| **Product Alternatives Advisor**       | Suggests healthier alternatives with specific product recommendations           |
+| **Long-Term Health Impact Analyst**    | Projects long-term health outcomes of regular consumption                       |
+| **Technical Analysis Agent**           | Explains AI reasoning, model confidence, and agent orchestration process        |
 
 ### Architecture Flow
 
@@ -226,6 +244,7 @@ User Profile + Product Data
 ### Decision Logic
 
 **Safety Assessment:**
+
 - Hard constraints (allergens, medical contraindications)
 - Soft scoring (nutritional goals, preferences)
 - Processing tier penalty (NOVA 4 products flagged)
@@ -237,12 +256,12 @@ User Profile + Product Data
 
 ### NOVA Classification Performance
 
-| Metric | Baseline (Validation) | Tuned (Test) |
-|--------|-----------------------|--------------|
-| Macro F1 | 0.856 | 0.857 |
-| Balanced Accuracy | 0.882 | 0.882 |
-| Weighted F1 | 0.875 | 0.878 |
-| ROC-AUC (OVR) | 0.974 | 0.974 |
+| Metric            | Baseline (Validation) | Tuned (Test) |
+| ----------------- | --------------------- | ------------ |
+| Macro F1          | 0.856                 | 0.857        |
+| Balanced Accuracy | 0.882                 | 0.882        |
+| Weighted F1       | 0.875                 | 0.878        |
+| ROC-AUC (OVR)     | 0.974                 | 0.974        |
 
 **Top SHAP features (overall):** added_sugars_100g, additives_n, additives_per_energy, salt_100g, proteins_100g.
 
@@ -252,11 +271,11 @@ NOVA 3 (processed foods) remains the most challenging class across all models, p
 
 Three models trained exclusively on NOVA 1 (whole foods) to detect nutritional outliers:
 
-| Model | Training Duration | Anomalies Detected (NOVA 4) |
-|-------|-------------------|------------------------------|
-| Isolation Forest | 0.22s | 2,485 (24.8%) |
-| One-Class SVM | 169.34s | 1,847 (18.4%) |
-| Local Outlier Factor | 4.65s | 2,614 (26.1%) |
+| Model                | Training Duration | Anomalies Detected (NOVA 4) |
+| -------------------- | ----------------- | --------------------------- |
+| Isolation Forest     | 0.22s             | 2,485 (24.8%)               |
+| One-Class SVM        | 169.34s           | 1,847 (18.4%)               |
+| Local Outlier Factor | 4.65s             | 2,614 (26.1%)               |
 
 **Key Insight:** Ultra-processed products (NOVA 4) show significantly higher anomaly rates compared to whole foods, validating the nutritional deviation hypothesis.
 
@@ -423,7 +442,7 @@ npm install
 Update `frontend/src/api.js` to point to your backend:
 
 ```javascript
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = "http://localhost:8000";
 ```
 
 3. Start the development server:
@@ -442,6 +461,7 @@ npm run dev
 ### Frontend Features
 
 **Main Analysis Page:**
+
 - Drag-and-drop or click to upload nutrition labels
 - Real-time OCR processing
 - NOVA classification with confidence scores
@@ -449,6 +469,7 @@ npm run dev
 - Processing tier explanation
 
 **Demo Page (`/demo`):**
+
 - **Step 1:** User Profile Configuration
   - Pre-populated with realistic defaults
   - Editable health conditions, goals, dietary restrictions, allergies
@@ -507,13 +528,13 @@ The server will start at `http://localhost:8000`
 
 ### API Endpoints
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/analyze` | POST | OCR + NOVA classification + anomaly detection |
-| `/health-insights` | POST | Generate multi-agent health insights from product data |
-| `/analyze-with-insights` | POST | Complete pipeline: OCR → Classification → Health Insights |
-| `/test/mock-insights` | POST | Test multi-agent system with mock data |
-| `/health` | GET | Health check endpoint |
+| Endpoint                 | Method | Purpose                                                   |
+| ------------------------ | ------ | --------------------------------------------------------- |
+| `/analyze`               | POST   | OCR + NOVA classification + anomaly detection             |
+| `/health-insights`       | POST   | Generate multi-agent health insights from product data    |
+| `/analyze-with-insights` | POST   | Complete pipeline: OCR → Classification → Health Insights |
+| `/test/mock-insights`    | POST   | Test multi-agent system with mock data                    |
+| `/health`                | GET    | Health check endpoint                                     |
 
 ### Example Usage
 
@@ -604,7 +625,6 @@ Raw Image → OCR → Features → Models → Predictions → Agents → Insight
                Feature Names          Health Context
 ```
 
-
 ## Dataset Information and Data Dictionary
 
 ### Dataset Information
@@ -649,6 +669,7 @@ Notes:
 ## Future Enhancements
 
 ### Planned Features
+
 - **Mobile App** - Native iOS/Android applications with camera integration
 - **Real-time Barcode Scanning** - Direct product lookup via barcode API
 - **Meal Planning** - Daily/weekly meal recommendations based on health goals
@@ -658,6 +679,7 @@ Notes:
 - **Offline Mode** - Local model inference without internet connection
 
 ### Model Improvements
+
 - **Ensemble Methods** - Combine multiple classifiers for improved accuracy
 - **Deep Learning** - CNN-based direct label image classification
 - **Transfer Learning** - Fine-tune vision transformers for nutrition label understanding
@@ -665,6 +687,7 @@ Notes:
 - **Multi-Task Learning** - Joint prediction of NOVA class, allergens, and nutrition quality
 
 ### Agent Enhancements
+
 - **Memory System** - Track user preferences and past recommendations
 - **Voice Interface** - Natural language queries via speech recognition
 - **Real-time Updates** - Stream agent insights as they're generated
@@ -693,9 +716,20 @@ This project is developed for academic purposes as part of the Master of Science
 - **Azure OpenAI** - For powering the multi-agent insights system
 - **Open-source Community** - For the excellent ML and web development tools
 
+## AI Use Disclosure
+
+AI assistance tools were used in the following capacities during the development of this project:
+
+- **Research and Planning:** AI tools were used to search for code snippets, explore modeling approaches, and identify applicable machine learning techniques (e.g., NOVA classification strategies, anomaly detection methods, SHAP explainability patterns). These suggestions were reviewed, adapted, and validated by the team before implementation.
+
+- **Copy Editing and Report Refinement:** An AI assistant was used to copy edit written documentation and the final report draft, check for redundancy, and provide feedback on areas that could be tightened up or that required additional clarification. The prompt provided to the tool included context about the project purpose, target audience (academic evaluators for the AAI-590 Capstone), and formatting guidelines.
+
+All AI-generated suggestions were critically reviewed by the team. Final decisions regarding methodology, implementation, and written content remain the work of the authors.
+
 ## Contact
 
 **Team Members:**
+
 - Jamshed Nabizada
 - Swapnil Patil
 
