@@ -1,6 +1,7 @@
 # NutriVision AI
 
-## AI-Powered Personalized Nutrition Assessment Platform
+## Context Aware Nutritional Assessment
+### Predicting Food Processing Tiers through Machine Learning
 
 An end-to-end machine learning system for predicting food processing tiers (NOVA classification) with anomaly detection, multi-agent health insights, and personalized nutritional guidance using Open Food Facts data.
 
