@@ -47,6 +47,16 @@ An end-to-end machine learning system for predicting food processing tiers (NOVA
 
 - Live demo: https://swapnilprakashpatil.github.io/aai590_5_capstone_project/
 
+## View Notebooks Online
+
+Explore the complete machine learning pipeline through our interactive notebooks hosted on GitHub Pages:
+
+1. **Exploratory Data Analysis**: https://swapnilprakashpatil.github.io/aai590_5_capstone_project/01_Exploratory_Data_Analysis.html
+2. **Feature Engineering and Model Preparation**: https://swapnilprakashpatil.github.io/aai590_5_capstone_project/02_Feature_Engineering_and_Model_Preperation.html
+3. **Model Training and Evaluation**: https://swapnilprakashpatil.github.io/aai590_5_capstone_project/03_Model_Training_and_Evaluation.html
+4. **Hyperparameter Tuning and Final Evaluation**: https://swapnilprakashpatil.github.io/aai590_5_capstone_project/04_Hyperparameter_Tuning_and_Final_Evaluation.html
+5. **Anomaly Detection**: https://swapnilprakashpatil.github.io/aai590_5_capstone_project/05_Anomaly_Detection.html
+
 ## Key Features
 
 ### 🎯 NOVA Classification
